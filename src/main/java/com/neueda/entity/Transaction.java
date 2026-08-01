@@ -1,27 +1,59 @@
 package com.neueda.entity;
 
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
-import java.util.Objects;
 
+@Entity
+@Table(name = "transactions")
 public class Transaction {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "transaction_id", nullable = false, unique = true)
     private String transactionId;
+
+    @Column(name = "account_id", nullable =false)
     private String accountId;
+
+    @Column(name = "payee_id", nullable = false)
     private String payeeId;
+
+    @Column(nullable = false)
     private Double amount;
+
+    @Column(nullable = false)
     private String currency;
+
+    @Column(name = "transaction_type", nullable = false)
     private String transactionType;
+
+    @Column(name = "transaction_time", nullable = false)
     private LocalDateTime transactionTime;
+
+    @Column(length = 255)
     private String description;
+
+    @Column(nullable = false)
     private String status;
 
+    // Default Constructor
     public Transaction() {
     }
 
-    public Transaction(Long id, String transactionId, String accountId, String payeeId, Double amount,
-                       String currency, String transactionType, LocalDateTime transactionTime,
-                       String description, String status) {
+    // Parameterized Constructor
+    public Transaction(Long id,
+                       String transactionId,
+                       String accountId,
+                       String payeeId,
+                       Double amount,
+                       String currency,
+                       String transactionType,
+                       LocalDateTime transactionTime,
+                       String description,
+                       String status) {
+
         this.id = id;
         this.transactionId = transactionId;
         this.accountId = accountId;
@@ -33,6 +65,8 @@ public class Transaction {
         this.description = description;
         this.status = status;
     }
+
+    // Getters and Setters
 
     public Long getId() {
         return id;
@@ -112,47 +146,5 @@ public class Transaction {
 
     public void setStatus(String status) {
         this.status = status;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (!(o instanceof Transaction that)) {
-            return false;
-        }
-        return Objects.equals(id, that.id)
-                && Objects.equals(transactionId, that.transactionId)
-                && Objects.equals(accountId, that.accountId)
-                && Objects.equals(payeeId, that.payeeId)
-                && Objects.equals(amount, that.amount)
-                && Objects.equals(currency, that.currency)
-                && Objects.equals(transactionType, that.transactionType)
-                && Objects.equals(transactionTime, that.transactionTime)
-                && Objects.equals(description, that.description)
-                && Objects.equals(status, that.status);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(id, transactionId, accountId, payeeId, amount, currency, transactionType,
-                transactionTime, description, status);
-    }
-
-    @Override
-    public String toString() {
-        return "Transaction{" +
-                "id=" + id +
-                ", transactionId='" + transactionId + '\'' +
-                ", accountId='" + accountId + '\'' +
-                ", payeeId='" + payeeId + '\'' +
-                ", amount=" + amount +
-                ", currency='" + currency + '\'' +
-                ", transactionType='" + transactionType + '\'' +
-                ", transactionTime=" + transactionTime +
-                ", description='" + description + '\'' +
-                ", status='" + status + '\'' +
-                '}';
     }
 }
