@@ -28,8 +28,9 @@ public class TransactionController {
     }
 
     // Add transaction
-    @PostMapping
+    @PostMapping("/add")
     public Transaction addTransaction(@RequestBody Transaction transaction) {
+        System.out.println("Adding transaction: ");
         return service.addTransaction(transaction);
     }
 
