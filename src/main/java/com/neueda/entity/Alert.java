@@ -1,24 +1,50 @@
 package com.neueda.entity;
 
-import java.time.LocalDateTime;
-import java.util.Objects;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
 
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "alerts")
 public class Alert {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "alert_id")
     private String alertId;
+
+    @Column(name = "transaction_id", nullable = false)
     private Long transactionId;
+
+    @Column(name = "rule_id", nullable = false)
     private Long ruleId;
+
+    @Column(name = "severity", nullable = false)
     private String severity;
+
+    @Column(name = "status", nullable = false)
     private String status;
+
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
     public Alert() {
     }
 
-    public Alert(Long id, String alertId, Long transactionId, Long ruleId, String severity, String status,
-                 LocalDateTime createdAt, LocalDateTime updatedAt) {
+    public Alert(Long id, String alertId, Long transactionId, Long ruleId, String severity,
+                 String status, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.alertId = alertId;
         this.transactionId = transactionId;
@@ -27,6 +53,20 @@ public class Alert {
         this.status = status;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+    }
+
+    @PrePersist
+    public void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        updatedAt = now;
+    }
+
+    @PreUpdate
+    public void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 
     public Long getId() {
@@ -93,28 +133,6 @@ public class Alert {
         this.updatedAt = updatedAt;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (!(o instanceof Alert alert)) {
-            return false;
-        }
-        return Objects.equals(id, alert.id)
-                && Objects.equals(alertId, alert.alertId)
-                && Objects.equals(transactionId, alert.transactionId)
-                && Objects.equals(ruleId, alert.ruleId)
-                && Objects.equals(severity, alert.severity)
-                && Objects.equals(status, alert.status)
-                && Objects.equals(createdAt, alert.createdAt)
-                && Objects.equals(updatedAt, alert.updatedAt);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(id, alertId, transactionId, ruleId, severity, status, createdAt, updatedAt);
-    }
 
     @Override
     public String toString() {

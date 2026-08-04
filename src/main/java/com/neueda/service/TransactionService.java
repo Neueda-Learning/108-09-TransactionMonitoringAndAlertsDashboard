@@ -1,8 +1,11 @@
 package com.neueda.service;
 
+import com.neueda.dto.AlertRequest;
+import com.neueda.entity.Rule;
 import com.neueda.entity.Transaction;
+import com.neueda.repository.RuleRepository;
 import com.neueda.repository.TransactionRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.neueda.ruleengine.RuleEngine;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -10,8 +13,17 @@ import java.util.List;
 @Service
 public class TransactionService {
 
-    @Autowired
-    private TransactionRepository repository;
+    private final TransactionRepository repository;
+    private final RuleRepository ruleRepository;
+    private final AlertService alertService;
+
+    public TransactionService(TransactionRepository repository,
+                              RuleRepository ruleRepository,
+                              AlertService alertService) {
+        this.repository = repository;
+        this.ruleRepository = ruleRepository;
+        this.alertService = alertService;
+    }
 
     // Get all transactions
     public List<Transaction> getAllTransactions() {
@@ -26,7 +38,27 @@ public class TransactionService {
 
     // Add new transaction
     public Transaction addTransaction(Transaction transaction) {
-        return repository.save(transaction);
+        Transaction savedTransaction = repository.save(transaction);
+
+        List<Rule> activeRules = ruleRepository.findByActiveTrue();
+        if (activeRules.isEmpty()) {
+            return savedTransaction;
+        }
+
+        RuleEngine ruleEngine = new RuleEngine(activeRules);
+        List<Transaction> accountHistory = repository.findByAccountId(savedTransaction.getAccountId());
+        List<com.neueda.ruleengine.Rule.EvaluationResult> triggeredResults =
+                ruleEngine.evaluateTriggered(savedTransaction, accountHistory);
+
+        for (com.neueda.ruleengine.Rule.EvaluationResult result : triggeredResults) {
+            AlertRequest alertRequest = new AlertRequest();
+            alertRequest.setTransactionId(savedTransaction.getId());
+            alertRequest.setRuleId(result.ruleId());
+            alertRequest.setSeverity(result.severity());
+            alertService.createAlert(alertRequest);
+        }
+
+        return savedTransaction;
     }
 
     // Update transaction
