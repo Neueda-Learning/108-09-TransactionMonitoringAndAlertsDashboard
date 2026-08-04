@@ -65,7 +65,37 @@ The frontend uses `http://localhost:8080/api` as its default API base URL from `
 
 ## Rules
 
-_To be documented in the next commit._
+**Implemented backend controller:** `src/main/java/com/neueda/controller/RuleController.java`
+
+**Frontend client coverage:** `frontend/src/api/rulesApi.js`
+
+**What exists:** create, list, get by id, update, and delete.
+
+**What does not exist:** no separate enable/disable endpoint. Rule activation is only changed through `PUT /api/rules/{id}` by sending the `active: Boolean` field in the request body.
+
+| Method | Path | Handler file + function name | Request body/params (with types) | Response shape (with types) | Status codes returned |
+|---|---|---|---|---|---|
+| POST | `/api/rules` | `src/main/java/com/neueda/controller/RuleController.java` → `createRule(RuleRequest request)` | Body: `RuleRequest { ruleName: String, ruleType: String, threshold: Double, timeWindowMinutes: Integer, severity: String, active: Boolean }` | `RuleResponse { id: Long, ruleName: String, ruleType: String, threshold: Double, timeWindowMinutes: Integer, severity: String, active: Boolean }` | `201 Created`; `500 Internal Server Error` if a rule with the same name already exists (`RuntimeException("Rule already exists.")`) |
+| GET | `/api/rules` | `src/main/java/com/neueda/controller/RuleController.java` → `getAllRules()` | No body. No path params. No query params. | `RuleResponse[]`, where `RuleResponse = { id: Long, ruleName: String, ruleType: String, threshold: Double, timeWindowMinutes: Integer, severity: String, active: Boolean }` | `200 OK` |
+| GET | `/api/rules/{id}` | `src/main/java/com/neueda/controller/RuleController.java` → `getRuleById(Long id)` | Path: `id: Long` | `RuleResponse { id: Long, ruleName: String, ruleType: String, threshold: Double, timeWindowMinutes: Integer, severity: String, active: Boolean }` | `200 OK`; `500 Internal Server Error` if not found (`RuntimeException("Rule not found")`) |
+| PUT | `/api/rules/{id}` | `src/main/java/com/neueda/controller/RuleController.java` → `updateRule(Long id, RuleRequest request)` | Path: `id: Long`; Body: `RuleRequest { ruleName: String, ruleType: String, threshold: Double, timeWindowMinutes: Integer, severity: String, active: Boolean }` | Updated `RuleResponse { id: Long, ruleName: String, ruleType: String, threshold: Double, timeWindowMinutes: Integer, severity: String, active: Boolean }` | `200 OK`; `500 Internal Server Error` if not found |
+| DELETE | `/api/rules/{id}` | `src/main/java/com/neueda/controller/RuleController.java` → `deleteRule(Long id)` | Path: `id: Long` | `String` literal: `"Rule deleted successfully."` | `200 OK`; `500 Internal Server Error` if not found |
+
+### Call chains
+
+- `POST /api/rules` → `RuleController.createRule()` → `RuleService.createRule()` → `RuleRepository.existsByRuleName(String)` → `RuleRepository.save(Rule)`
+- `GET /api/rules` → `RuleController.getAllRules()` → `RuleService.getAllRules()` → `RuleRepository.findAll()`
+- `GET /api/rules/{id}` → `RuleController.getRuleById()` → `RuleService.getRuleById()` → `RuleRepository.findById(Long)`
+- `PUT /api/rules/{id}` → `RuleController.updateRule()` → `RuleService.updateRule()` → `RuleRepository.findById(Long)` → `RuleRepository.save(Rule)`
+- `DELETE /api/rules/{id}` → `RuleController.deleteRule()` → `RuleService.deleteRule()` → `RuleRepository.findById(Long)` → `RuleRepository.delete(Rule)`
+
+### Frontend mappings
+
+- `rulesApi.getAll()` → `GET /api/rules`
+- `rulesApi.getById(id)` → `GET /api/rules/{id}`
+- `rulesApi.create(payload)` → `POST /api/rules`
+- `rulesApi.update(id, payload)` → `PUT /api/rules/{id}`
+- `rulesApi.remove(id)` → `DELETE /api/rules/{id}`
 
 ---
 
@@ -90,5 +120,6 @@ _To be documented in the next commit._
 ## Swagger / OpenAPI
 
 _To be documented in the next commit._
+
 
 
