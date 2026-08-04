@@ -1,27 +1,150 @@
 package com.neueda.entity;
 
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
-public record Transaction(
+@Entity
+@Table(name = "transactions")
+public class Transaction {
 
-        Long id,
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-        String transactionId,
+    @Column(name = "transaction_id", nullable = false, unique = true)
+    private String transactionId;
 
-        String accountId,
+    @Column(name = "account_id", nullable =false)
+    private String accountId;
 
-        String payeeId,
+    @Column(name = "payee_id", nullable = false)
+    private String payeeId;
 
-        Double amount,
+    @Column(nullable = false)
+    private Double amount;
 
-        String currency,
+    @Column(nullable = false)
+    private String currency;
 
-        String transactionType,
+    @Column(name = "transaction_type", nullable = false)
+    private String transactionType;
 
-        LocalDateTime transactionTime,
+    @Column(name = "transaction_time", nullable = false)
+    private LocalDateTime transactionTime;
 
-        String description,
+    @Column(length = 255)
+    private String description;
 
-        String status
+    @Column(nullable = false)
+    private String status;
 
-) {}
+    // Default Constructor
+    public Transaction() {
+    }
+
+    // Parameterized Constructor
+    public Transaction(Long id,
+                       String transactionId,
+                       String accountId,
+                       String payeeId,
+                       Double amount,
+                       String currency,
+                       String transactionType,
+                       LocalDateTime transactionTime,
+                       String description,
+                       String status) {
+
+        this.id = id;
+        this.transactionId = transactionId;
+        this.accountId = accountId;
+        this.payeeId = payeeId;
+        this.amount = amount;
+        this.currency = currency;
+        this.transactionType = transactionType;
+        this.transactionTime = transactionTime;
+        this.description = description;
+        this.status = status;
+    }
+
+    // Getters and Setters
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getTransactionId() {
+        return transactionId;
+    }
+
+    public void setTransactionId(String transactionId) {
+        this.transactionId = transactionId;
+    }
+
+    public String getAccountId() {
+        return accountId;
+    }
+
+    public void setAccountId(String accountId) {
+        this.accountId = accountId;
+    }
+
+    public String getPayeeId() {
+        return payeeId;
+    }
+
+    public void setPayeeId(String payeeId) {
+        this.payeeId = payeeId;
+    }
+
+    public Double getAmount() {
+        return amount;
+    }
+
+    public void setAmount(Double amount) {
+        this.amount = amount;
+    }
+
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
+    }
+
+    public String getTransactionType() {
+        return transactionType;
+    }
+
+    public void setTransactionType(String transactionType) {
+        this.transactionType = transactionType;
+    }
+
+    public LocalDateTime getTransactionTime() {
+        return transactionTime;
+    }
+
+    public void setTransactionTime(LocalDateTime transactionTime) {
+        this.transactionTime = transactionTime;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+}

@@ -2,59 +2,35 @@ package com.neueda.ruleengine;
 
 import com.neueda.entity.Transaction;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Fraud detection rule that flags transactions whose amount exceeds a configured threshold.
- *
- * <p>Design notes:
- * <ul>
- *     <li>Primary configuration source is {@code com.neueda.entity.Rule.threshold} to avoid hardcoded business values.</li>
- *     <li>A temporary fallback threshold is used only when configuration is missing/invalid.</li>
- *     <li>Evaluation returns structured metadata so downstream orchestration can build alerts consistently.</li>
- * </ul>
- */
-public class AmountThresholdRule {
+public class AmountThresholdRule implements Rule {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(AmountThresholdRule.class);
 
-	/**
-	 * Temporary fallback threshold until central rule configuration management is wired end-to-end.
-	 */
 	private static final BigDecimal TEMPORARY_DEFAULT_THRESHOLD = BigDecimal.valueOf(10_000d);
 
 	private static final String DEFAULT_RULE_NAME = "Amount Threshold Rule";
 	private static final String DEFAULT_SEVERITY = "MEDIUM";
 
-	private final com.neueda.entity.Rule ruleConfiguration;
+	private final com.neueda.entity.Rule configuration;
 	private final BigDecimal effectiveThreshold;
 	private final String effectiveRuleName;
 	private final String effectiveSeverity;
 
-	/**
-	 * Creates an amount-threshold rule from an existing persisted rule configuration.
-	 *
-	 * <p>If any configuration value is missing, sensible defaults are used so evaluation remains safe and deterministic.
-	 *
-	 * @param ruleConfiguration persisted rule definition; may be {@code null} when configuration is unavailable
-	 */
-	public AmountThresholdRule(final com.neueda.entity.Rule ruleConfiguration) {
-		this.ruleConfiguration = ruleConfiguration;
-		this.effectiveThreshold = resolveThreshold(ruleConfiguration);
-		this.effectiveRuleName = resolveRuleName(ruleConfiguration);
-		this.effectiveSeverity = resolveSeverity(ruleConfiguration);
+	public AmountThresholdRule(final com.neueda.entity.Rule configuration) {
+		this.configuration = configuration;
+		this.effectiveThreshold = resolveThreshold(configuration);
+		this.effectiveRuleName = resolveRuleName(configuration);
+		this.effectiveSeverity = resolveSeverity(configuration);
 	}
 
-	/**
-	 * Evaluates a transaction against the configured amount threshold.
-	 *
-	 * @param transaction transaction candidate for fraud checks; may be {@code null}
-	 * @return a rich evaluation result containing trigger state and alert context details
-	 */
-	public EvaluationResult evaluate(final Transaction transaction) {
-		// A null transaction cannot be evaluated safely, so return a traceable non-trigger result.
+	@Override
+	public EvaluationResult evaluate(final Transaction transaction, final List<Transaction> accountHistory) {
 		if (transaction == null) {
 			LOGGER.warn("Amount threshold evaluation skipped because transaction is null");
 			return EvaluationResult.notTriggered(
@@ -62,134 +38,116 @@ public class AmountThresholdRule {
 					null,
 					effectiveRuleName,
 					effectiveSeverity,
-					effectiveThreshold,
-					"Transaction is null"
+					"Transaction is null",
+					Map.of("threshold", effectiveThreshold)
 			);
 		}
 
-		// Inactive rules are intentionally skipped to respect operational toggles from configuration.
-		if (!isRuleActive()) {
-			LOGGER.debug("Amount threshold rule '{}' is inactive; transaction '{}' will not be evaluated", effectiveRuleName, transaction.transactionId());
+		if (!isActive()) {
+			LOGGER.debug("Amount threshold rule '{}' is inactive; transaction '{}' will not be evaluated", effectiveRuleName, transaction.getTransactionId());
 			return EvaluationResult.notTriggered(
 					ruleId(),
-					transaction.id(),
+					transaction.getId(),
 					effectiveRuleName,
 					effectiveSeverity,
-					effectiveThreshold,
-					"Rule is inactive"
+					"Rule is inactive",
+					Map.of("threshold", effectiveThreshold)
 			);
 		}
 
-		// Missing amount is treated as non-trigger to prevent false positives from incomplete payloads.
-		final Double amount = transaction.amount();
+		final Double amount = transaction.getAmount();
 		if (amount == null) {
-			LOGGER.warn("Amount threshold evaluation skipped for transaction '{}' because amount is null", transaction.transactionId());
+			LOGGER.warn("Amount threshold evaluation skipped for transaction '{}' because amount is null", transaction.getTransactionId());
 			return EvaluationResult.notTriggered(
 					ruleId(),
-					transaction.id(),
+					transaction.getId(),
 					effectiveRuleName,
 					effectiveSeverity,
-					effectiveThreshold,
-					"Transaction amount is null"
+					"Transaction amount is null",
+					Map.of("threshold", effectiveThreshold)
 			);
 		}
 
-		// BigDecimal is used for financial comparisons to avoid floating-point precision issues.
 		final BigDecimal transactionAmount = BigDecimal.valueOf(amount);
 		final boolean triggered = transactionAmount.compareTo(effectiveThreshold) > 0;
+		final Map<String, Object> metadata = new HashMap<>();
+		metadata.put("transactionAmount", transactionAmount);
+		metadata.put("threshold", effectiveThreshold);
 		if (triggered) {
 			final String reason = String.format(
 					"Transaction amount %s exceeds threshold %s",
 					transactionAmount,
 					effectiveThreshold
 			);
-			LOGGER.info("Amount threshold rule triggered for transaction '{}' with amount {}", transaction.transactionId(), transactionAmount);
+			LOGGER.info("Amount threshold rule triggered for transaction '{}' with amount {}", transaction.getTransactionId(), transactionAmount);
 			return EvaluationResult.triggered(
 					ruleId(),
-					transaction.id(),
+					transaction.getId(),
 					effectiveRuleName,
 					effectiveSeverity,
-					transactionAmount,
-					effectiveThreshold,
 					reason,
-					buildAlertContext(transaction.id(), reason)
+					metadata
 			);
 		}
 
-		LOGGER.debug("Amount threshold rule not triggered for transaction '{}' (amount={}, threshold={})", transaction.transactionId(), transactionAmount, effectiveThreshold);
+		LOGGER.debug("Amount threshold rule not triggered for transaction '{}' (amount={}, threshold={})", transaction.getTransactionId(), transactionAmount, effectiveThreshold);
 		return EvaluationResult.notTriggered(
 				ruleId(),
-				transaction.id(),
+				transaction.getId(),
 				effectiveRuleName,
 				effectiveSeverity,
-				effectiveThreshold,
-				"Transaction amount does not exceed threshold"
+				"Transaction amount does not exceed threshold",
+				metadata
 		);
 	}
 
-	/**
-	 * Convenience method when only the trigger flag is needed.
-	 *
-	 * @param transaction transaction candidate for fraud checks
-	 * @return {@code true} when the transaction exceeds threshold and rule is active
-	 */
 	public boolean isTriggeredBy(final Transaction transaction) {
 		return evaluate(transaction).triggered();
 	}
 
-	/**
-	 * @return human-readable rule name from configuration or default fallback
-	 */
+	@Override
 	public String getRuleName() {
 		return effectiveRuleName;
 	}
 
-	/**
-	 * @return severity used for generated alert context
-	 */
+	@Override
 	public String getSeverity() {
 		return effectiveSeverity;
 	}
 
-	private AlertContext buildAlertContext(final Long transactionId, final String reason) {
-		return new AlertContext(
-				transactionId,
-				ruleId(),
-				effectiveRuleName,
-				effectiveSeverity,
-				reason,
-				LocalDateTime.now()
-		);
+	@Override
+	public Long getRuleId() {
+		return ruleId();
+	}
+
+	@Override
+	public boolean isActive() {
+		return configuration == null || configuration.getActive() == null || configuration.getActive();
 	}
 
 	private Long ruleId() {
-		return ruleConfiguration == null ? null : ruleConfiguration.id();
+		return configuration == null ? null : configuration.getId();
 	}
 
-	private boolean isRuleActive() {
-		// Null is treated as active so partially populated configurations still execute instead of silently bypassing fraud checks.
-		return ruleConfiguration == null || ruleConfiguration.active() == null || ruleConfiguration.active();
-	}
-
-	private static String resolveRuleName(final com.neueda.entity.Rule ruleConfiguration) {
-		if (ruleConfiguration != null && hasText(ruleConfiguration.ruleName())) {
-			return ruleConfiguration.ruleName().trim();
+	private static String resolveRuleName(final com.neueda.entity.Rule configuration) {
+		if (configuration != null && hasText(configuration.getRuleName())) {
+			return configuration.getRuleName().trim();
 		}
 		LOGGER.debug("Using default rule name because configuration ruleName is missing");
 		return DEFAULT_RULE_NAME;
 	}
 
-	private static String resolveSeverity(final com.neueda.entity.Rule ruleConfiguration) {
-		if (ruleConfiguration != null && hasText(ruleConfiguration.severity())) {
-			return ruleConfiguration.severity().trim();
+	private static String resolveSeverity(final com.neueda.entity.Rule configuration) {
+		if (configuration != null && hasText(configuration.getSeverity())) {
+			return configuration.getSeverity().trim();
 		}
 		LOGGER.debug("Using default severity because configuration severity is missing");
 		return DEFAULT_SEVERITY;
 	}
 
-	private static BigDecimal resolveThreshold(final com.neueda.entity.Rule ruleConfiguration) {
-		if (ruleConfiguration != null && ruleConfiguration.threshold() != null && ruleConfiguration.threshold() > 0d) {
-			return BigDecimal.valueOf(ruleConfiguration.threshold());
+	private static BigDecimal resolveThreshold(final com.neueda.entity.Rule configuration) {
+		if (configuration != null && configuration.getThreshold() != null && configuration.getThreshold() > 0d) {
+			return BigDecimal.valueOf(configuration.getThreshold());
 		}
 		LOGGER.warn("Using temporary default threshold {} because configuration threshold is missing or invalid", TEMPORARY_DEFAULT_THRESHOLD);
 		return TEMPORARY_DEFAULT_THRESHOLD;
@@ -199,72 +157,4 @@ public class AmountThresholdRule {
 		return value != null && !value.trim().isEmpty();
 	}
 
-	/**
-	 * Structured result of threshold evaluation to support RuleEngine orchestration and alert generation.
-	 *
-	 * @param triggered whether the rule fired for the transaction
-	 * @param ruleId configured rule identifier, if available
-	 * @param transactionId evaluated transaction identifier, if available
-	 * @param ruleName effective rule name used in evaluation
-	 * @param severity effective severity used in evaluation
-	 * @param transactionAmount evaluated amount when available
-	 * @param threshold threshold used for the comparison
-	 * @param reason human-readable explanation of the outcome
-	 * @param alertContext payload that downstream components can use to create an alert; null when not triggered
-	 */
-	public record EvaluationResult(
-			boolean triggered,
-			Long ruleId,
-			Long transactionId,
-			String ruleName,
-			String severity,
-			BigDecimal transactionAmount,
-			BigDecimal threshold,
-			String reason,
-			AlertContext alertContext
-	) {
-		private static EvaluationResult triggered(
-				final Long ruleId,
-				final Long transactionId,
-				final String ruleName,
-				final String severity,
-				final BigDecimal transactionAmount,
-				final BigDecimal threshold,
-				final String reason,
-				final AlertContext alertContext
-		) {
-			return new EvaluationResult(true, ruleId, transactionId, ruleName, severity, transactionAmount, threshold, reason, alertContext);
-		}
-
-		private static EvaluationResult notTriggered(
-				final Long ruleId,
-				final Long transactionId,
-				final String ruleName,
-				final String severity,
-				final BigDecimal threshold,
-				final String reason
-		) {
-			return new EvaluationResult(false, ruleId, transactionId, ruleName, severity, null, threshold, reason, null);
-		}
-	}
-
-	/**
-	 * Minimal alert payload produced by this rule when fraud is detected.
-	 *
-	 * @param transactionId related transaction identifier
-	 * @param ruleId triggering rule identifier
-	 * @param ruleName triggering rule name
-	 * @param severity severity for alert prioritization
-	 * @param reason explanation for analysts and audit
-	 * @param evaluatedAt UTC-local evaluation timestamp
-	 */
-	public record AlertContext(
-			Long transactionId,
-			Long ruleId,
-			String ruleName,
-			String severity,
-			String reason,
-			LocalDateTime evaluatedAt
-	) {
-	}
 }

@@ -1,53 +1,25 @@
-package com.neueda.entity;
+package com.neueda.dto;
 
-import jakarta.persistence.*;
+public class RuleRequest {
 
-@Entity
-@Table(name = "rules")
-public class Rule {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(name = "rule_name")
     private String ruleName;
-
-    @Column(name = "rule_type")
     private String ruleType;
-
-    @Column(name = "threshold")
     private Double threshold;
-
-    @Column(name = "time_window_minutes")
     private Integer timeWindowMinutes;
-
-    @Column(name = "severity")
     private String severity;
-
-    @Column(name = "active")
     private Boolean active;
 
-    public Rule() {
+    public RuleRequest() {
     }
 
-    public Rule(Long id, String ruleName, String ruleType, Double threshold,
-                Integer timeWindowMinutes, String severity, Boolean active) {
-        this.id = id;
+    public RuleRequest(String ruleName, String ruleType, Double threshold,
+                       Integer timeWindowMinutes, String severity, Boolean active) {
         this.ruleName = ruleName;
         this.ruleType = ruleType;
         this.threshold = threshold;
         this.timeWindowMinutes = timeWindowMinutes;
         this.severity = severity;
         this.active = active;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
     }
 
     public String getRuleName() {
@@ -96,18 +68,5 @@ public class Rule {
 
     public void setActive(Boolean active) {
         this.active = active;
-    }
-
-    @Override
-    public String toString() {
-        return "Rule{" +
-                "id=" + id +
-                ", ruleName='" + ruleName + '\'' +
-                ", ruleType='" + ruleType + '\'' +
-                ", threshold=" + threshold +
-                ", timeWindowMinutes=" + timeWindowMinutes +
-                ", severity='" + severity + '\'' +
-                ", active=" + active +
-                '}';
     }
 }
