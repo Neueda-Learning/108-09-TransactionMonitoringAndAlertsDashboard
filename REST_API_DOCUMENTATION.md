@@ -139,19 +139,82 @@ These rules are enforced in `src/main/java/com/neueda/service/AlertService.java`
 
 ## Other / Admin / Health / Data Generator Routes
 
-_To be documented in the next commit._
+No additional implemented REST endpoints were found for:
+
+- health checks
+- admin routes
+- data generator or seed routes
+- search/filter-only endpoints
+- dedicated alert workflow routes beyond `PUT /api/alerts/{id}/status`
+
+### Evidence
+
+- Only three backend REST controllers exist in `src/main/java/com/neueda/controller/`: `TransactionController`, `RuleController`, and `AlertController`.
+- No other controller classes with `@RestController` or `@Controller` were found.
+- No additional `@GetMapping`, `@PostMapping`, `@PutMapping`, `@DeleteMapping`, `@PatchMapping`, or `@RequestMapping` annotations were found outside those three controllers.
+- No `@RequestParam` usage exists in backend code, so query-based filter/search endpoints are not implemented.
 
 ---
 
 ## Frontend API Coverage
 
-_To be documented in the next commit._
+### Shared API client
+
+- `frontend/src/api/apiClient.js` exports `apiRequest(path, options)`.
+- `apiRequest(...)` calls `fetch(`${API_BASE_URL}${path}`, ...)`.
+- `API_BASE_URL` is defined in `frontend/src/constants.js` as `process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080/api'`.
+
+### Transactions coverage
+
+- `frontend/src/api/transactionsApi.js` covers all implemented transaction endpoints:
+  - `getAll()` → `GET /api/transactions`
+  - `getByTransactionId(transactionId)` → `GET /api/transactions/{transactionId}`
+  - `create(payload)` → `POST /api/transactions/add`
+  - `update(transactionId, payload)` → `PUT /api/transactions/{transactionId}`
+  - `remove(transactionId)` → `DELETE /api/transactions/{transactionId}`
+- These methods are used from `frontend/src/App.js`.
+
+### Rules coverage
+
+- `frontend/src/api/rulesApi.js` covers all implemented rule endpoints:
+  - `getAll()` → `GET /api/rules`
+  - `getById(id)` → `GET /api/rules/{id}`
+  - `create(payload)` → `POST /api/rules`
+  - `update(id, payload)` → `PUT /api/rules/{id}`
+  - `remove(id)` → `DELETE /api/rules/{id}`
+- These methods are used from `frontend/src/App.js`.
+
+### Alerts coverage gap
+
+- There is no `frontend/src/api/alertsApi.js`.
+- `frontend/src/pages/AlertsPage.jsx` does not call backend alert endpoints.
+- The page derives alerts locally from transaction/rule data using `deriveAlertsFromData(...)` from `frontend/src/utils/alerts.js`.
+- The page subtitle explicitly states: `Live backend alert endpoints are not available yet; this page uses derived alerts for now`.
+
+### Coverage summary
+
+| Resource | Backend endpoints implemented | Frontend API wrapper present | Frontend actively uses backend endpoints |
+|---|---:|---|---|
+| Transactions | 5 | Yes | Yes |
+| Rules | 5 | Yes | Yes |
+| Alerts | 5 | No | No |
 
 ---
 
 ## Swagger / OpenAPI
 
-_To be documented in the next commit._
+There is no usable Swagger/OpenAPI specification file in this repository.
+
+### What was checked
+
+- `src/main/java/com/neueda/config/SwaggerConfig.java` exists but is empty.
+- No `openapi.yaml`, `openapi.yml`, `openapi.json`, or Swagger spec files were found in the workspace.
+- `pom.xml` does not include `springdoc`, `springfox`, or other Swagger/OpenAPI dependencies.
+
+### Conclusion
+
+This document is derived directly from implemented controller, service, repository, and frontend client code rather than from a checked-in or generated OpenAPI/Swagger specification.
+
 
 
 
