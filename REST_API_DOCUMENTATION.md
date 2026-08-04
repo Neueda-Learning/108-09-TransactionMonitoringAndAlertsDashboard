@@ -101,7 +101,39 @@ The frontend uses `http://localhost:8080/api` as its default API base URL from `
 
 ## Alerts
 
-_To be documented in the next commit._
+**Implemented backend controller:** `src/main/java/com/neueda/controller/AlertController.java`
+
+**Frontend client coverage:** none. There is no `frontend/src/api/alertsApi.js`.
+
+**What exists:** create, list, get by id, update status, and delete.
+
+**What does not exist:** no separate endpoints for acknowledge, investigate, close, dismiss, alert history, or get triggering transactions. Status transitions are all funneled through `PUT /api/alerts/{id}/status`.
+
+| Method | Path | Handler file + function name | Request body/params (with types) | Response shape (with types) | Status codes returned |
+|---|---|---|---|---|---|
+| POST | `/api/alerts` | `src/main/java/com/neueda/controller/AlertController.java` → `createAlert(AlertRequest request)` | Body: `AlertRequest { alertId?: String, transactionId: Long, ruleId: Long, severity: String, status?: String }`; validation: `transactionId` = `@NotNull`, `ruleId` = `@NotNull`, `severity` = `@NotBlank` | `AlertResponse { id: Long, alertId: String, transactionId: Long, ruleId: Long, severity: String, status: String, createdAt: LocalDateTime, updatedAt: LocalDateTime }` | `201 Created`; `400 Bad Request` for bean-validation failure, invalid severity, or invalid initial status |
+| GET | `/api/alerts` | `src/main/java/com/neueda/controller/AlertController.java` → `getAllAlerts()` | No body. No path params. No query params. | `AlertResponse[]`, where `AlertResponse = { id: Long, alertId: String, transactionId: Long, ruleId: Long, severity: String, status: String, createdAt: LocalDateTime, updatedAt: LocalDateTime }` | `200 OK` |
+| GET | `/api/alerts/{id}` | `src/main/java/com/neueda/controller/AlertController.java` → `getAlertById(Long id)` | Path: `id: Long` | `AlertResponse { id: Long, alertId: String, transactionId: Long, ruleId: Long, severity: String, status: String, createdAt: LocalDateTime, updatedAt: LocalDateTime }` | `200 OK`; `404 Not Found` if alert does not exist |
+| PUT | `/api/alerts/{id}/status` | `src/main/java/com/neueda/controller/AlertController.java` → `updateAlertStatus(Long id, AlertStatusRequest request)` | Path: `id: Long`; Body: `AlertStatusRequest { status: String }`; validation: `status` = `@NotBlank` | Updated `AlertResponse { id: Long, alertId: String, transactionId: Long, ruleId: Long, severity: String, status: String, createdAt: LocalDateTime, updatedAt: LocalDateTime }` | `200 OK`; `400 Bad Request` for blank status, invalid status, same-status update, or invalid status transition; `404 Not Found` if alert does not exist |
+| DELETE | `/api/alerts/{id}` | `src/main/java/com/neueda/controller/AlertController.java` → `deleteAlert(Long id)` | Path: `id: Long` | No response body | `204 No Content`; `404 Not Found` if alert does not exist |
+
+### Call chains
+
+- `POST /api/alerts` → `AlertController.createAlert()` → `AlertService.createAlert()` → `AlertRepository.save(Alert)`
+- `GET /api/alerts` → `AlertController.getAllAlerts()` → `AlertService.getAllAlerts()` → `AlertRepository.findAll()`
+- `GET /api/alerts/{id}` → `AlertController.getAlertById()` → `AlertService.getAlertById()` → `AlertService.findAlertById()` → `AlertRepository.findById(Long)`
+- `PUT /api/alerts/{id}/status` → `AlertController.updateAlertStatus()` → `AlertService.updateAlertStatus()` → `AlertService.findAlertById()` → `AlertRepository.findById(Long)` → `AlertRepository.save(Alert)`
+- `DELETE /api/alerts/{id}` → `AlertController.deleteAlert()` → `AlertService.deleteAlert()` → `AlertService.findAlertById()` → `AlertRepository.findById(Long)` → `AlertRepository.delete(Alert)`
+
+### Status transition rules implemented in service code
+
+- `OPEN` → `ACKNOWLEDGED` or `DISMISSED`
+- `ACKNOWLEDGED` → `INVESTIGATING`
+- `INVESTIGATING` → `CLOSED`
+- `CLOSED` → no further transitions
+- `DISMISSED` → no further transitions
+
+These rules are enforced in `src/main/java/com/neueda/service/AlertService.java` by `validateStatusTransition(...)`.
 
 ---
 
@@ -120,6 +152,7 @@ _To be documented in the next commit._
 ## Swagger / OpenAPI
 
 _To be documented in the next commit._
+
 
 
 
