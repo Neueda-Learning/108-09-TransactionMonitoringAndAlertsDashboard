@@ -742,6 +742,107 @@ textarea {
   border-color: var(--badge-dismissed-border);
 }
 
+/* ── Trend chips (Dashboard metric cards) ─────────────────────────────────── */
+.trend-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: var(--space-2);
+  font-size: var(--font-sm);
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.trend-chip--up {
+  color: var(--color-success);
+}
+
+.trend-chip--down {
+  color: var(--color-error);
+}
+
+.trend-chip--neutral {
+  color: var(--muted);
+}
+
+/* ── Risk-highlight card variant ──────────────────────────────────────────── */
+.card--risk {
+  border-left: 3px solid var(--badge-high-border);
+}
+
+.risk-value {
+  margin-top: var(--space-2);
+  display: block;
+  font-size: var(--font-xl);
+  line-height: var(--line-height-xl);
+  color: var(--color-error);
+}
+
+/* ── Dashboard table: sticky header + fixed-height scroll ─────────────────── */
+.dashboard-table-scroll {
+  max-height: 340px;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.sortable-th {
+  cursor: pointer;
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.sortable-th:hover {
+  background: var(--surface-hover);
+}
+
+.sortable-th:focus-visible {
+  outline: var(--focus-ring-width) solid color-mix(in srgb, var(--primary) 65%, var(--surface));
+  outline-offset: calc(var(--border-width-1) * -2);
+}
+
+.sortable-th--active {
+  color: var(--primary);
+}
+
+.sort-icon {
+  font-size: var(--font-xs);
+  opacity: 0.7;
+}
+
+/* ── Quick-link card ──────────────────────────────────────────────────────── */
+.card--link {
+  display: block;
+  text-decoration: none;
+  color: var(--text);
+  transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.card--link:hover {
+  background: var(--surface-hover);
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.12);
+  transform: translateY(-1px);
+}
+
+.card--link:focus-visible {
+  outline: var(--focus-ring-width) solid color-mix(in srgb, var(--primary) 65%, var(--surface));
+  outline-offset: var(--border-width-1);
+}
+
+.card--link h3 {
+  color: var(--primary);
+}
+
+.card-link-desc {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-sm);
+  line-height: var(--line-height-sm);
+  color: var(--muted);
+}
+
 @media (max-width: 1024px) {
   .container {
     width: calc(100% - var(--space-5));
