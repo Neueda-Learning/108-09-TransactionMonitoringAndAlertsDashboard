@@ -62,13 +62,12 @@ export function deriveAlertsFromData(transactions, rules) {
 
 export function canTransitionAlert(currentStatus, targetStatus) {
   const transitions = {
-    [ALERT_STATUS.OPEN]: [ALERT_STATUS.ACKNOWLEDGED],
-    [ALERT_STATUS.ACKNOWLEDGED]: [ALERT_STATUS.INVESTIGATING, ALERT_STATUS.DISMISSED],
-    [ALERT_STATUS.INVESTIGATING]: [ALERT_STATUS.CLOSED, ALERT_STATUS.DISMISSED],
+    [ALERT_STATUS.OPEN]: [ALERT_STATUS.ACKNOWLEDGED, ALERT_STATUS.DISMISSED],
+    [ALERT_STATUS.ACKNOWLEDGED]: [ALERT_STATUS.INVESTIGATING],
+    [ALERT_STATUS.INVESTIGATING]: [ALERT_STATUS.CLOSED],
     [ALERT_STATUS.CLOSED]: [],
     [ALERT_STATUS.DISMISSED]: []
   };
 
   return transitions[currentStatus]?.includes(targetStatus) || false;
 }
-

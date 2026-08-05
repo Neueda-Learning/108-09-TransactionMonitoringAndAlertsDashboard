@@ -1,77 +1,129 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import StatusBadge from '../components/StatusBadge';
 import { ALERT_STATUS } from '../constants';
-import { canTransitionAlert, deriveAlertsFromData } from '../utils/alerts';
+import { alertsApi } from '../api/alertsApi';
+import { canTransitionAlert } from '../utils/alerts';
 import { formatDateTime } from '../utils/formatters';
 
-function enrichAlerts(baseAlerts, updates) {
-  const updatesMap = new Map(updates.map((item) => [item.id, item]));
+const REFRESH_INTERVAL_MS = Number(process.env.REACT_APP_ALERTS_POLL_MS || 3000);
 
-  return baseAlerts.map((alert) => {
-    const update = updatesMap.get(alert.id);
-    if (!update) {
-      return alert;
-    }
+function normalizeAlerts(apiAlerts, transactions, rules) {
+  const rulesById = new Map(rules.map((rule) => [rule.id, rule]));
+  const transactionsById = new Map(transactions.map((tx) => [tx.id, tx]));
 
-    return {
-      ...alert,
-      ...update,
-      history: update.history || alert.history
-    };
-  });
+  return (Array.isArray(apiAlerts) ? apiAlerts : [])
+    .map((alert) => {
+      const linkedRule = rulesById.get(alert.ruleId);
+      const linkedTransaction = transactionsById.get(alert.transactionId);
+
+      return {
+        ...alert,
+        ruleName: linkedRule?.ruleName || `Rule #${alert.ruleId ?? '-'}`,
+        ruleType: linkedRule?.ruleType || '-',
+        transactionRef: linkedTransaction?.transactionId || alert.transactionId,
+        reason:
+          linkedRule?.ruleName && linkedTransaction?.transactionId
+            ? `${linkedRule.ruleName} triggered by transaction ${linkedTransaction.transactionId}`
+            : `Rule ${alert.ruleId ?? '-'} triggered this alert`
+      };
+    })
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 
 export default function AlertsPage({ transactions, rules }) {
-  const [localUpdates, setLocalUpdates] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
-  const derivedAlerts = useMemo(
-    () => deriveAlertsFromData(transactions, rules),
-    [transactions, rules]
+  const fetchAlerts = useCallback(async () => {
+    try {
+      setError('');
+      const backendAlerts = await alertsApi.getAll();
+      setAlerts(normalizeAlerts(backendAlerts, transactions, rules));
+    } catch (err) {
+      setError(err.message || 'Failed to load alerts from backend API.');
+    }
+  }, [transactions, rules]);
+
+  useEffect(() => {
+    let intervalId;
+    let isMounted = true;
+
+    async function loadInitial() {
+      setLoading(true);
+      try {
+        const backendAlerts = await alertsApi.getAll();
+        if (isMounted) {
+          setAlerts(normalizeAlerts(backendAlerts, transactions, rules));
+          setError('');
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err.message || 'Failed to load alerts from backend API.');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadInitial();
+
+    intervalId = setInterval(() => {
+      fetchAlerts();
+    }, REFRESH_INTERVAL_MS);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, [fetchAlerts, transactions, rules]);
+
+  const activeAlerts = useMemo(
+    () =>
+      alerts.filter(
+        (alert) => ![ALERT_STATUS.CLOSED, ALERT_STATUS.DISMISSED].includes(alert.status)
+      ),
+    [alerts]
   );
 
-  const alerts = useMemo(
-    () => enrichAlerts(derivedAlerts, localUpdates),
-    [derivedAlerts, localUpdates]
-  );
-
-  const activeAlerts = alerts.filter(
-    (alert) => ![ALERT_STATUS.CLOSED, ALERT_STATUS.DISMISSED].includes(alert.status)
-  );
-
-  function transitionAlert(alert, targetStatus) {
+  async function transitionAlert(alert, targetStatus) {
     if (!canTransitionAlert(alert.status, targetStatus)) {
       return;
     }
 
-    const timestamp = new Date().toISOString();
-    const updated = {
-      ...alert,
-      status: targetStatus,
-      updatedAt: timestamp,
-      history: [
-        ...(alert.history || []),
-        {
-          status: targetStatus,
-          changedAt: timestamp,
-          note: 'Status updated from dashboard'
-        }
-      ]
-    };
+    setIsUpdatingStatus(true);
 
-    setLocalUpdates((prev) => [...prev.filter((entry) => entry.id !== alert.id), updated]);
+    try {
+      await alertsApi.updateStatus(alert.id, targetStatus);
+      await fetchAlerts();
+    } catch (err) {
+      setError(err.message || 'Failed to update alert status.');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
   }
 
   return (
     <section>
       <PageHeader
         title="Alerts"
-        subtitle="Live backend alert endpoints are not available yet; this page uses derived alerts for now"
+        subtitle={`Realtime backend alerts via /api/alerts (auto-refresh every ${REFRESH_INTERVAL_MS / 1000}s)`}
+        action={
+          <button className="btn" onClick={fetchAlerts} disabled={loading || isUpdatingStatus}>
+            Refresh Now
+          </button>
+        }
       />
+
+      {error ? <div className="error-box">{error}</div> : null}
 
       <div className="card-grid">
         <article className="card">
-          <h3>Total Derived Alerts</h3>
+          <h3>Total Alerts</h3>
           <strong>{alerts.length}</strong>
         </article>
         <article className="card">
@@ -83,9 +135,12 @@ export default function AlertsPage({ transactions, rules }) {
       <article className="panel">
         <h2>Active Alerts</h2>
 
-        {activeAlerts.length === 0 ? (
-          <p>No alerts currently match active amount-threshold rules.</p>
-        ) : (
+        {loading ? <p>Loading...</p> : null}
+        {!loading && activeAlerts.length === 0 ? (
+          <p>No active alerts from backend.</p>
+        ) : null}
+
+        {!loading && activeAlerts.length > 0 ? (
           <table className="data-table">
             <thead>
               <tr>
@@ -109,34 +164,46 @@ export default function AlertsPage({ transactions, rules }) {
                   <td>
                     <StatusBadge value={alert.status} />
                   </td>
-                  <td>{alert.transactionId}</td>
+                  <td>{alert.transactionRef}</td>
                   <td>{formatDateTime(alert.createdAt)}</td>
                   <td>
                     <div className="table-actions">
                       <button
                         className="btn btn-small"
-                        disabled={!canTransitionAlert(alert.status, ALERT_STATUS.ACKNOWLEDGED)}
+                        disabled={
+                          isUpdatingStatus ||
+                          !canTransitionAlert(alert.status, ALERT_STATUS.ACKNOWLEDGED)
+                        }
                         onClick={() => transitionAlert(alert, ALERT_STATUS.ACKNOWLEDGED)}
                       >
                         Acknowledge
                       </button>
                       <button
                         className="btn btn-small"
-                        disabled={!canTransitionAlert(alert.status, ALERT_STATUS.INVESTIGATING)}
+                        disabled={
+                          isUpdatingStatus ||
+                          !canTransitionAlert(alert.status, ALERT_STATUS.INVESTIGATING)
+                        }
                         onClick={() => transitionAlert(alert, ALERT_STATUS.INVESTIGATING)}
                       >
                         Investigate
                       </button>
                       <button
                         className="btn btn-small"
-                        disabled={!canTransitionAlert(alert.status, ALERT_STATUS.CLOSED)}
+                        disabled={
+                          isUpdatingStatus ||
+                          !canTransitionAlert(alert.status, ALERT_STATUS.CLOSED)
+                        }
                         onClick={() => transitionAlert(alert, ALERT_STATUS.CLOSED)}
                       >
                         Close
                       </button>
                       <button
                         className="btn btn-small btn-danger"
-                        disabled={!canTransitionAlert(alert.status, ALERT_STATUS.DISMISSED)}
+                        disabled={
+                          isUpdatingStatus ||
+                          !canTransitionAlert(alert.status, ALERT_STATUS.DISMISSED)
+                        }
                         onClick={() => transitionAlert(alert, ALERT_STATUS.DISMISSED)}
                       >
                         Dismiss
@@ -147,14 +214,15 @@ export default function AlertsPage({ transactions, rules }) {
               ))}
             </tbody>
           </table>
-        )}
+        ) : null}
       </article>
 
       <article className="panel">
         <h2>Alert History</h2>
-        {alerts.length === 0 ? (
-          <p>No history yet.</p>
-        ) : (
+        {loading ? <p>Loading...</p> : null}
+        {!loading && alerts.length === 0 ? <p>No history yet.</p> : null}
+
+        {!loading && alerts.length > 0 ? (
           <table className="data-table">
             <thead>
               <tr>
@@ -177,9 +245,8 @@ export default function AlertsPage({ transactions, rules }) {
               ))}
             </tbody>
           </table>
-        )}
+        ) : null}
       </article>
     </section>
   );
 }
-
