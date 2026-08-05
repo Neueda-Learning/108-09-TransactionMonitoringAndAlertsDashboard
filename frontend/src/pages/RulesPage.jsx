@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import StatusBadge from '../components/StatusBadge';
+import SkeletonLoader from '../components/SkeletonLoader';
+import EmptyState from '../components/EmptyState';
+import ErrorState from '../components/ErrorState';
 import { RULE_TYPES, SEVERITIES } from '../constants';
 
 const defaultForm = {
@@ -21,7 +24,15 @@ function toPayload(formState) {
   };
 }
 
-export default function RulesPage({ rules, loading, error, onCreate, onUpdate, onDelete }) {
+export default function RulesPage({
+  rules,
+  loading,
+  error,
+  onRetry,
+  onCreate,
+  onUpdate,
+  onDelete
+}) {
   const [formState, setFormState] = useState(defaultForm);
   const [editingId, setEditingId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -67,7 +78,7 @@ export default function RulesPage({ rules, loading, error, onCreate, onUpdate, o
         subtitle="Manage monitoring rules used by the backend engine"
       />
 
-      {error ? <div className="error-box">{error}</div> : null}
+      {error ? <ErrorState message="Unable to load rules." error={error} onRetry={onRetry} /> : null}
 
       <article className="panel">
         <h2>{editingId ? 'Edit Rule' : 'Add Rule'}</h2>
@@ -162,51 +173,60 @@ export default function RulesPage({ rules, loading, error, onCreate, onUpdate, o
       <article className="panel">
         <h2>Rule List</h2>
 
-        {loading ? <p>Loading...</p> : null}
-        {!loading && rules.length === 0 ? <p>No rules found.</p> : null}
+        {loading ? <SkeletonLoader rows={6} rowHeight={18} /> : null}
+        {!loading && rules.length === 0 ? (
+          <EmptyState
+            icon={<span aria-hidden="true">[!]</span>}
+            message="No rules found."
+            actionLabel={onRetry ? 'Refresh Rules' : ''}
+            onAction={onRetry}
+          />
+        ) : null}
 
         {!loading && rules.length > 0 ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Threshold</th>
-                <th>Window (m)</th>
-                <th>Severity</th>
-                <th>Active</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rules.map((rule) => (
-                <tr key={rule.id}>
-                  <td>{rule.id}</td>
-                  <td>{rule.ruleName}</td>
-                  <td>{rule.ruleType}</td>
-                  <td>{rule.threshold ?? '-'}</td>
-                  <td>{rule.timeWindowMinutes ?? '-'}</td>
-                  <td>
-                    <StatusBadge value={rule.severity} />
-                  </td>
-                  <td>
-                    <StatusBadge value={rule.active ? 'ACTIVE' : 'INACTIVE'} />
-                  </td>
-                  <td>
-                    <div className="table-actions">
-                      <button className="btn btn-small" onClick={() => startEdit(rule)}>
-                        Edit
-                      </button>
-                      <button className="btn btn-small btn-danger" onClick={() => onDelete(rule.id)}>
-                        Delete
-                      </button>
-                    </div>
-                  </td>
+          <div className="table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Threshold</th>
+                  <th>Window (m)</th>
+                  <th>Severity</th>
+                  <th>Active</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rules.map((rule) => (
+                  <tr key={rule.id}>
+                    <td data-label="ID">{rule.id}</td>
+                    <td data-label="Name">{rule.ruleName}</td>
+                    <td data-label="Type">{rule.ruleType}</td>
+                    <td data-label="Threshold">{rule.threshold ?? '-'}</td>
+                    <td data-label="Window (m)">{rule.timeWindowMinutes ?? '-'}</td>
+                    <td data-label="Severity">
+                      <StatusBadge value={rule.severity} />
+                    </td>
+                    <td data-label="Active">
+                      <StatusBadge value={rule.active ? 'ACTIVE' : 'INACTIVE'} />
+                    </td>
+                    <td data-label="Actions">
+                      <div className="table-actions">
+                        <button className="btn btn-small" onClick={() => startEdit(rule)}>
+                          Edit
+                        </button>
+                        <button className="btn btn-small btn-danger" onClick={() => onDelete(rule.id)}>
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : null}
       </article>
     </section>

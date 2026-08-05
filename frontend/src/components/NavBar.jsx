@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 
 const links = [
@@ -8,7 +8,7 @@ const links = [
   { to: '/rules', label: 'Rules' }
 ];
 
-const MOBILE_BREAKPOINT_QUERY = '(max-width: 767px)';
+const MOBILE_BREAKPOINT_QUERY = '(max-width: 1023px)';
 
 function isRouteActive(pathname, route) {
   if (route === '/') {
@@ -18,10 +18,6 @@ function isRouteActive(pathname, route) {
   return pathname === route || pathname.startsWith(`${route}/`);
 }
 
-function getEnvironmentLabel() {
-  return process.env.REACT_APP_ENV_LABEL || process.env.REACT_APP_ENV || 'Local / Dev';
-}
-
 export default function NavBar() {
   const { pathname } = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -29,7 +25,6 @@ export default function NavBar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const menuButtonRef = useRef(null);
   const mobilePanelRef = useRef(null);
-  const environmentLabel = useMemo(getEnvironmentLabel, []);
 
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') {
@@ -153,9 +148,6 @@ export default function NavBar() {
               </NavLink>
             ))}
           </nav>
-          <span className="env-pill" title={`Environment: ${environmentLabel}`}>
-            {environmentLabel}
-          </span>
           <button
             ref={menuButtonRef}
             type="button"
@@ -223,4 +215,3 @@ export default function NavBar() {
     </header>
   );
 }
-

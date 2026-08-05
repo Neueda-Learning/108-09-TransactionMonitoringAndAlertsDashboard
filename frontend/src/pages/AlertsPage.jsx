@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import StatusBadge from '../components/StatusBadge';
+import SkeletonLoader from '../components/SkeletonLoader';
+import EmptyState from '../components/EmptyState';
+import ErrorState from '../components/ErrorState';
+import { useToast } from '../components/Toast';
 import { ALERT_STATUS } from '../constants';
 import { alertsApi } from '../api/alertsApi';
 import { canTransitionAlert } from '../utils/alerts';
@@ -36,6 +40,7 @@ export default function AlertsPage({ transactions, rules }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const { toastSuccess, toastError } = useToast();
 
   const fetchAlerts = useCallback(async () => {
     try {
@@ -100,8 +105,11 @@ export default function AlertsPage({ transactions, rules }) {
     try {
       await alertsApi.updateStatus(alert.id, targetStatus);
       await fetchAlerts();
+      toastSuccess(`Alert ${alert.alertId} moved to ${targetStatus}.`);
     } catch (err) {
-      setError(err.message || 'Failed to update alert status.');
+      const failureMessage = err.message || 'Failed to update alert status.';
+      setError(failureMessage);
+      toastError(failureMessage, { details: String(err) });
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -119,7 +127,9 @@ export default function AlertsPage({ transactions, rules }) {
         }
       />
 
-      {error ? <div className="error-box">{error}</div> : null}
+      {error ? (
+        <ErrorState message="Unable to load alerts." error={error} onRetry={fetchAlerts} />
+      ) : null}
 
       <div className="card-grid">
         <article className="card">
@@ -135,116 +145,132 @@ export default function AlertsPage({ transactions, rules }) {
       <article className="panel">
         <h2>Active Alerts</h2>
 
-        {loading ? <p>Loading...</p> : null}
+        {loading ? <SkeletonLoader rows={6} rowHeight={18} /> : null}
         {!loading && activeAlerts.length === 0 ? (
-          <p>No active alerts from backend.</p>
+          <EmptyState
+            icon={<span aria-hidden="true">[i]</span>}
+            message="No active alerts from backend."
+            actionLabel="Refresh Now"
+            onAction={fetchAlerts}
+          />
         ) : null}
 
         {!loading && activeAlerts.length > 0 ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Alert ID</th>
-                <th>Rule</th>
-                <th>Severity</th>
-                <th>Status</th>
-                <th>Transaction</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {activeAlerts.map((alert) => (
-                <tr key={alert.id}>
-                  <td>{alert.alertId}</td>
-                  <td>{alert.ruleName}</td>
-                  <td>
-                    <StatusBadge value={alert.severity} />
-                  </td>
-                  <td>
-                    <StatusBadge value={alert.status} />
-                  </td>
-                  <td>{alert.transactionRef}</td>
-                  <td>{formatDateTime(alert.createdAt)}</td>
-                  <td>
-                    <div className="table-actions">
-                      <button
-                        className="btn btn-small"
-                        disabled={
-                          isUpdatingStatus ||
-                          !canTransitionAlert(alert.status, ALERT_STATUS.ACKNOWLEDGED)
-                        }
-                        onClick={() => transitionAlert(alert, ALERT_STATUS.ACKNOWLEDGED)}
-                      >
-                        Acknowledge
-                      </button>
-                      <button
-                        className="btn btn-small"
-                        disabled={
-                          isUpdatingStatus ||
-                          !canTransitionAlert(alert.status, ALERT_STATUS.INVESTIGATING)
-                        }
-                        onClick={() => transitionAlert(alert, ALERT_STATUS.INVESTIGATING)}
-                      >
-                        Investigate
-                      </button>
-                      <button
-                        className="btn btn-small"
-                        disabled={
-                          isUpdatingStatus ||
-                          !canTransitionAlert(alert.status, ALERT_STATUS.CLOSED)
-                        }
-                        onClick={() => transitionAlert(alert, ALERT_STATUS.CLOSED)}
-                      >
-                        Close
-                      </button>
-                      <button
-                        className="btn btn-small btn-danger"
-                        disabled={
-                          isUpdatingStatus ||
-                          !canTransitionAlert(alert.status, ALERT_STATUS.DISMISSED)
-                        }
-                        onClick={() => transitionAlert(alert, ALERT_STATUS.DISMISSED)}
-                      >
-                        Dismiss
-                      </button>
-                    </div>
-                  </td>
+          <div className="table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Alert ID</th>
+                  <th>Rule</th>
+                  <th>Severity</th>
+                  <th>Status</th>
+                  <th>Transaction</th>
+                  <th>Created</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {activeAlerts.map((alert) => (
+                  <tr key={alert.id}>
+                    <td data-label="Alert ID">{alert.alertId}</td>
+                    <td data-label="Rule">{alert.ruleName}</td>
+                    <td data-label="Severity">
+                      <StatusBadge value={alert.severity} />
+                    </td>
+                    <td data-label="Status">
+                      <StatusBadge value={alert.status} />
+                    </td>
+                    <td data-label="Transaction">{alert.transactionRef}</td>
+                    <td data-label="Created">{formatDateTime(alert.createdAt)}</td>
+                    <td data-label="Actions">
+                      <div className="table-actions">
+                        <button
+                          className="btn btn-small"
+                          disabled={
+                            isUpdatingStatus ||
+                            !canTransitionAlert(alert.status, ALERT_STATUS.ACKNOWLEDGED)
+                          }
+                          onClick={() => transitionAlert(alert, ALERT_STATUS.ACKNOWLEDGED)}
+                        >
+                          Acknowledge
+                        </button>
+                        <button
+                          className="btn btn-small"
+                          disabled={
+                            isUpdatingStatus ||
+                            !canTransitionAlert(alert.status, ALERT_STATUS.INVESTIGATING)
+                          }
+                          onClick={() => transitionAlert(alert, ALERT_STATUS.INVESTIGATING)}
+                        >
+                          Investigate
+                        </button>
+                        <button
+                          className="btn btn-small"
+                          disabled={
+                            isUpdatingStatus ||
+                            !canTransitionAlert(alert.status, ALERT_STATUS.CLOSED)
+                          }
+                          onClick={() => transitionAlert(alert, ALERT_STATUS.CLOSED)}
+                        >
+                          Close
+                        </button>
+                        <button
+                          className="btn btn-small btn-danger"
+                          disabled={
+                            isUpdatingStatus ||
+                            !canTransitionAlert(alert.status, ALERT_STATUS.DISMISSED)
+                          }
+                          onClick={() => transitionAlert(alert, ALERT_STATUS.DISMISSED)}
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : null}
       </article>
 
       <article className="panel">
         <h2>Alert History</h2>
-        {loading ? <p>Loading...</p> : null}
-        {!loading && alerts.length === 0 ? <p>No history yet.</p> : null}
+        {loading ? <SkeletonLoader rows={4} rowHeight={18} /> : null}
+        {!loading && alerts.length === 0 ? (
+          <EmptyState
+            icon={<span aria-hidden="true">[i]</span>}
+            message="No history yet."
+            actionLabel="Refresh Now"
+            onAction={fetchAlerts}
+          />
+        ) : null}
 
         {!loading && alerts.length > 0 ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Alert ID</th>
-                <th>Status</th>
-                <th>Updated At</th>
-                <th>Reason</th>
-              </tr>
-            </thead>
-            <tbody>
-              {alerts.map((alert) => (
-                <tr key={`history-${alert.id}`}>
-                  <td>{alert.alertId}</td>
-                  <td>
-                    <StatusBadge value={alert.status} />
-                  </td>
-                  <td>{formatDateTime(alert.updatedAt)}</td>
-                  <td>{alert.reason}</td>
+          <div className="table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Alert ID</th>
+                  <th>Status</th>
+                  <th>Updated At</th>
+                  <th>Reason</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {alerts.map((alert) => (
+                  <tr key={`history-${alert.id}`}>
+                    <td data-label="Alert ID">{alert.alertId}</td>
+                    <td data-label="Status">
+                      <StatusBadge value={alert.status} />
+                    </td>
+                    <td data-label="Updated At">{formatDateTime(alert.updatedAt)}</td>
+                    <td data-label="Reason">{alert.reason}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : null}
       </article>
     </section>

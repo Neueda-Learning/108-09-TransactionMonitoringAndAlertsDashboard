@@ -8,12 +8,14 @@ import RulesPage from './pages/RulesPage';
 import AlertsPage from './pages/AlertsPage';
 import { transactionsApi } from './api/transactionsApi';
 import { rulesApi } from './api/rulesApi';
+import { useToast } from './components/Toast';
 
 function App() {
   const [transactions, setTransactions] = useState([]);
   const [rules, setRules] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { toastSuccess, toastError } = useToast();
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -43,8 +45,11 @@ function App() {
     try {
       await transactionsApi.create(payload);
       await loadData();
+      toastSuccess('Transaction created successfully.');
     } catch (err) {
-      setError(err.message || 'Failed to create transaction.');
+      const failureMessage = err.message || 'Failed to create transaction.';
+      setError(failureMessage);
+      toastError(failureMessage, { details: String(err) });
       throw err;
     }
   }
@@ -54,8 +59,11 @@ function App() {
     try {
       await transactionsApi.update(transactionId, payload);
       await loadData();
+      toastSuccess('Transaction updated successfully.');
     } catch (err) {
-      setError(err.message || 'Failed to update transaction.');
+      const failureMessage = err.message || 'Failed to update transaction.';
+      setError(failureMessage);
+      toastError(failureMessage, { details: String(err) });
       throw err;
     }
   }
@@ -65,8 +73,11 @@ function App() {
     try {
       await transactionsApi.remove(transactionId);
       await loadData();
+      toastSuccess('Transaction deleted successfully.');
     } catch (err) {
-      setError(err.message || 'Failed to delete transaction.');
+      const failureMessage = err.message || 'Failed to delete transaction.';
+      setError(failureMessage);
+      toastError(failureMessage, { details: String(err) });
     }
   }
 
@@ -75,8 +86,11 @@ function App() {
     try {
       await rulesApi.create(payload);
       await loadData();
+      toastSuccess('Rule created successfully.');
     } catch (err) {
-      setError(err.message || 'Failed to create rule.');
+      const failureMessage = err.message || 'Failed to create rule.';
+      setError(failureMessage);
+      toastError(failureMessage, { details: String(err) });
       throw err;
     }
   }
@@ -86,8 +100,11 @@ function App() {
     try {
       await rulesApi.update(id, payload);
       await loadData();
+      toastSuccess('Rule updated successfully.');
     } catch (err) {
-      setError(err.message || 'Failed to update rule.');
+      const failureMessage = err.message || 'Failed to update rule.';
+      setError(failureMessage);
+      toastError(failureMessage, { details: String(err) });
       throw err;
     }
   }
@@ -97,8 +114,11 @@ function App() {
     try {
       await rulesApi.remove(id);
       await loadData();
+      toastSuccess('Rule deleted successfully.');
     } catch (err) {
-      setError(err.message || 'Failed to delete rule.');
+      const failureMessage = err.message || 'Failed to delete rule.';
+      setError(failureMessage);
+      toastError(failureMessage, { details: String(err) });
     }
   }
 
@@ -130,6 +150,7 @@ function App() {
                   rules={rules}
                   loading={loading}
                   error={error}
+                  onRetry={loadData}
                 />
               }
             />
@@ -140,6 +161,7 @@ function App() {
                   transactions={transactions}
                   loading={loading}
                   error={error}
+                  onRetry={loadData}
                   onCreate={handleCreateTransaction}
                   onUpdate={handleUpdateTransaction}
                   onDelete={handleDeleteTransaction}
@@ -153,6 +175,7 @@ function App() {
                   rules={rules}
                   loading={loading}
                   error={error}
+                  onRetry={loadData}
                   onCreate={handleCreateRule}
                   onUpdate={handleUpdateRule}
                   onDelete={handleDeleteRule}

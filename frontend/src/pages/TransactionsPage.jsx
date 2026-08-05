@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import StatusBadge from '../components/StatusBadge';
+import SkeletonLoader from '../components/SkeletonLoader';
+import EmptyState from '../components/EmptyState';
+import ErrorState from '../components/ErrorState';
 import { formatDateTime, formatMoney, toDateTimeInputValue } from '../utils/formatters';
 
 const defaultForm = {
@@ -27,6 +30,7 @@ export default function TransactionsPage({
   transactions,
   loading,
   error,
+  onRetry,
   onCreate,
   onUpdate,
   onDelete
@@ -60,6 +64,12 @@ export default function TransactionsPage({
   function resetForm() {
     setFormState(defaultForm);
     setEditingTransactionId(null);
+  }
+
+  function clearFilters() {
+    setSearchTerm('');
+    setStatusFilter('ALL');
+    setAccountFilter('');
   }
 
   function startEdit(tx) {
@@ -101,7 +111,9 @@ export default function TransactionsPage({
         subtitle="Record transactions and search/filter historic events"
       />
 
-      {error ? <div className="error-box">{error}</div> : null}
+      {error ? (
+        <ErrorState message="Unable to load transactions." error={error} onRetry={onRetry} />
+      ) : null}
 
       <div className="panel">
         <h2>{editingTransactionId ? 'Edit Transaction' : 'Add Transaction'}</h2>
@@ -231,52 +243,61 @@ export default function TransactionsPage({
           </select>
         </div>
 
-        {loading ? <p>Loading...</p> : null}
-        {!loading && filteredTransactions.length === 0 ? <p>No transactions found.</p> : null}
+        {loading ? <SkeletonLoader rows={6} rowHeight={18} /> : null}
+        {!loading && filteredTransactions.length === 0 ? (
+          <EmptyState
+            icon={<span aria-hidden="true">[?]</span>}
+            message="No transactions found."
+            actionLabel="Reset Filters"
+            onAction={clearFilters}
+          />
+        ) : null}
 
         {!loading && filteredTransactions.length > 0 ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Transaction ID</th>
-                <th>Account</th>
-                <th>Payee</th>
-                <th>Amount</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th>Time</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredTransactions.map((tx) => (
-                <tr key={tx.id || tx.transactionId}>
-                  <td>{tx.transactionId}</td>
-                  <td>{tx.accountId}</td>
-                  <td>{tx.payeeId}</td>
-                  <td>{formatMoney(tx.amount, tx.currency || 'USD')}</td>
-                  <td>{tx.transactionType}</td>
-                  <td>
-                    <StatusBadge value={tx.status} />
-                  </td>
-                  <td>{formatDateTime(tx.transactionTime)}</td>
-                  <td>
-                    <div className="table-actions">
-                      <button className="btn btn-small" onClick={() => startEdit(tx)}>
-                        Edit
-                      </button>
-                      <button
-                        className="btn btn-small btn-danger"
-                        onClick={() => onDelete(tx.transactionId)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
+          <div className="table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Transaction ID</th>
+                  <th>Account</th>
+                  <th>Payee</th>
+                  <th>Amount</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Time</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredTransactions.map((tx) => (
+                  <tr key={tx.id || tx.transactionId}>
+                    <td data-label="Transaction ID">{tx.transactionId}</td>
+                    <td data-label="Account">{tx.accountId}</td>
+                    <td data-label="Payee">{tx.payeeId}</td>
+                    <td data-label="Amount">{formatMoney(tx.amount, tx.currency || 'USD')}</td>
+                    <td data-label="Type">{tx.transactionType}</td>
+                    <td data-label="Status">
+                      <StatusBadge value={tx.status} />
+                    </td>
+                    <td data-label="Time">{formatDateTime(tx.transactionTime)}</td>
+                    <td data-label="Actions">
+                      <div className="table-actions">
+                        <button className="btn btn-small" onClick={() => startEdit(tx)}>
+                          Edit
+                        </button>
+                        <button
+                          className="btn btn-small btn-danger"
+                          onClick={() => onDelete(tx.transactionId)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : null}
       </article>
     </section>
