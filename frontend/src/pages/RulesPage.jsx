@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import StatusBadge from '../components/StatusBadge';
 import SkeletonLoader from '../components/SkeletonLoader';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { RULE_TYPES, SEVERITIES } from '../constants';
 import SeverityDonutChart from '../components/charts/SeverityDonutChart';
 import RuleTriggerFrequencyChart from '../components/charts/RuleTriggerFrequencyChart';
@@ -16,6 +17,51 @@ const defaultForm = {
   severity: 'MEDIUM',
   active: true
 };
+
+const RULE_TYPE_CONFIG = {
+  AMOUNT_THRESHOLD: {
+    showThreshold: true,
+    showTimeWindow: false,
+    thresholdLabel: 'Threshold Amount',
+    thresholdHelper: 'Triggers when a single transaction amount exceeds this value.',
+    helperText:
+      'Threshold is the max allowed amount for one transaction. Time window is not used for this type.'
+  },
+  VELOCITY: {
+    showThreshold: true,
+    showTimeWindow: true,
+    thresholdLabel: 'Max Transactions (Threshold)',
+    thresholdHelper: 'Maximum allowed number of transactions in the selected time window.',
+    helperText:
+      'Threshold is the transaction count limit. Time window defines how many minutes are evaluated together.'
+  },
+  NEW_PAYEE: {
+    showThreshold: true,
+    showTimeWindow: false,
+    thresholdLabel: 'Minimum Alert Amount',
+    thresholdHelper: 'Only new-payee transactions at or above this amount are evaluated.',
+    helperText:
+      'Threshold is the minimum amount that can trigger an alert for a first-time payee. Time window is not used.'
+  },
+  DAILY_LIMIT: {
+    showThreshold: true,
+    showTimeWindow: false,
+    thresholdLabel: 'Daily Limit Amount',
+    thresholdHelper: 'Triggers when projected daily total exceeds this value.',
+    helperText:
+      'Threshold is the daily limit cap for an account. Time window is not used because checks are calendar-day based.'
+  }
+};
+
+const SEVERITY_SORT_RANK = {
+  LOW: 1,
+  MEDIUM: 2,
+  HIGH: 3
+};
+
+function normalizeSeverity(value) {
+  return String(value || '').toUpperCase();
+}
 
 function toPayload(formState) {
   return {
@@ -41,6 +87,25 @@ export default function RulesPage({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [severityFilter, setSeverityFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('severity');
+  const [sortDirection, setSortDirection] = useState('desc');
+  const [pendingDeleteRule, setPendingDeleteRule] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const normalizedRuleName = formState.ruleName.trim().toLowerCase();
+  const ruleTypeConfig = RULE_TYPE_CONFIG[formState.ruleType] || RULE_TYPE_CONFIG.AMOUNT_THRESHOLD;
+
+  const isDuplicateName = useMemo(() => {
+    if (!normalizedRuleName) {
+      return false;
+    }
+
+    return rules.some((rule) => {
+      const sameName = (rule.ruleName || '').trim().toLowerCase() === normalizedRuleName;
+      const sameRecord = editingId != null && String(rule.id) === String(editingId);
+      return sameName && !sameRecord;
+    });
+  }, [rules, normalizedRuleName, editingId]);
 
   function resetForm() {
     setFormState(defaultForm);
@@ -85,14 +150,66 @@ export default function RulesPage({
     setSearchQuery((prev) => (prev === ruleName ? '' : ruleName));
   }
 
-  // eslint-disable-next-line no-unused-vars
-  const filteredRules = rules.filter((rule) => {
-    const matchesSeverity = !severityFilter || (rule.severity || '').toUpperCase() === severityFilter;
-    const matchesSearch =
-      !searchQuery ||
-      (rule.ruleName || '').toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSeverity && matchesSearch;
-  });
+  const filteredSortedRules = useMemo(() => {
+    const normalizedSearch = searchQuery.trim().toLowerCase();
+
+    const filtered = rules.filter((rule) => {
+      const matchesSeverity = !severityFilter || normalizeSeverity(rule.severity) === severityFilter;
+      const matchesSearch =
+        !normalizedSearch || (rule.ruleName || '').toLowerCase().includes(normalizedSearch);
+      return matchesSeverity && matchesSearch;
+    });
+
+    const directionMultiplier = sortDirection === 'asc' ? 1 : -1;
+
+    return [...filtered].sort((left, right) => {
+      let comparison = 0;
+
+      if (sortBy === 'severity') {
+        comparison =
+          (SEVERITY_SORT_RANK[normalizeSeverity(left.severity)] || 0) -
+          (SEVERITY_SORT_RANK[normalizeSeverity(right.severity)] || 0);
+      } else if (sortBy === 'active') {
+        comparison = Number(Boolean(left.active)) - Number(Boolean(right.active));
+      } else if (sortBy === 'type') {
+        comparison = (left.ruleType || '').localeCompare(right.ruleType || '');
+      }
+
+      if (comparison === 0) {
+        comparison = (left.ruleName || '').localeCompare(right.ruleName || '');
+      }
+
+      return comparison * directionMultiplier;
+    });
+  }, [rules, severityFilter, searchQuery, sortBy, sortDirection]);
+
+  function handleDeleteClick(rule) {
+    setPendingDeleteRule(rule);
+  }
+
+  async function handleConfirmDelete() {
+    if (!pendingDeleteRule || isDeleting) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await onDelete(pendingDeleteRule.id);
+      setPendingDeleteRule(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  const deletingCriticalRule =
+    Boolean(pendingDeleteRule?.active) && normalizeSeverity(pendingDeleteRule?.severity) === 'HIGH';
+  const deleteMessage = pendingDeleteRule
+    ? `Delete rule "${pendingDeleteRule.ruleName || pendingDeleteRule.id}"? This cannot be undone.${
+        deletingCriticalRule
+          ? '\nWarning: This rule is currently Active and HIGH severity, so deleting it can weaken production monitoring coverage immediately.'
+          : ''
+      }`
+    : '';
 
   return (
     <section>
@@ -114,6 +231,11 @@ export default function RulesPage({
               value={formState.ruleName}
               onChange={(event) => setFormState((prev) => ({ ...prev, ruleName: event.target.value }))}
             />
+            {isDuplicateName ? (
+              <small className="field-warning">
+                A rule with this name already exists. You can still save if this is intentional.
+              </small>
+            ) : null}
           </label>
 
           <label>
@@ -128,30 +250,39 @@ export default function RulesPage({
                 </option>
               ))}
             </select>
+            <small className="field-helper">{ruleTypeConfig.helperText}</small>
           </label>
 
-          <label>
-            Threshold
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={formState.threshold}
-              onChange={(event) => setFormState((prev) => ({ ...prev, threshold: event.target.value }))}
-            />
-          </label>
+          {ruleTypeConfig.showThreshold ? (
+            <label>
+              {ruleTypeConfig.thresholdLabel}
+              <input
+                type="number"
+                step={formState.ruleType === 'VELOCITY' ? '1' : '0.01'}
+                min={formState.ruleType === 'VELOCITY' ? '1' : '0'}
+                value={formState.threshold}
+                onChange={(event) => setFormState((prev) => ({ ...prev, threshold: event.target.value }))}
+              />
+              <small className="field-helper">{ruleTypeConfig.thresholdHelper}</small>
+            </label>
+          ) : null}
 
-          <label>
-            Time Window (Minutes)
-            <input
-              type="number"
-              min="0"
-              value={formState.timeWindowMinutes}
-              onChange={(event) =>
-                setFormState((prev) => ({ ...prev, timeWindowMinutes: event.target.value }))
-              }
-            />
-          </label>
+          {ruleTypeConfig.showTimeWindow ? (
+            <label>
+              Time Window (Minutes)
+              <input
+                type="number"
+                min="1"
+                value={formState.timeWindowMinutes}
+                onChange={(event) =>
+                  setFormState((prev) => ({ ...prev, timeWindowMinutes: event.target.value }))
+                }
+              />
+              <small className="field-helper">
+                Number of minutes used to calculate transaction velocity for each account.
+              </small>
+            </label>
+          ) : null}
 
           <label>
             Severity
@@ -168,16 +299,19 @@ export default function RulesPage({
           </label>
 
           <label>
-            Active
-            <select
-              value={String(formState.active)}
-              onChange={(event) =>
-                setFormState((prev) => ({ ...prev, active: event.target.value === 'true' }))
-              }
+            Active / Inactive
+            <button
+              className={`toggle-switch ${formState.active ? 'is-active' : ''}`}
+              type="button"
+              role="switch"
+              aria-checked={formState.active}
+              onClick={() => setFormState((prev) => ({ ...prev, active: !prev.active }))}
             >
-              <option value="true">true</option>
-              <option value="false">false</option>
-            </select>
+              <span className="toggle-switch-track" aria-hidden="true">
+                <span className="toggle-switch-thumb" />
+              </span>
+              <span className="toggle-switch-label">{formState.active ? 'Active' : 'Inactive'}</span>
+            </button>
           </label>
 
           <div className="actions-row col-span-2">
@@ -209,6 +343,20 @@ export default function RulesPage({
             )}
           </p>
           <SeverityDonutChart items={rules} onSegmentClick={handleSeveritySegmentClick} />
+          <div className="severity-legend" aria-label="Severity legend">
+            <span className="severity-legend-item">
+              <StatusBadge value="HIGH" />
+              High risk, immediate attention recommended
+            </span>
+            <span className="severity-legend-item">
+              <StatusBadge value="MEDIUM" />
+              Moderate risk, monitor and investigate
+            </span>
+            <span className="severity-legend-item">
+              <StatusBadge value="LOW" />
+              Lower risk, monitor trend impact
+            </span>
+          </div>
         </article>
         <article className="card">
           <h3>Rule Trigger Frequency</h3>
@@ -231,6 +379,30 @@ export default function RulesPage({
       <article className="panel">
         <h2>Rule List</h2>
 
+        <div className="filter-row rules-list-controls">
+          <input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search rule name"
+            aria-label="Search rule name"
+          />
+          <label>
+            Sort by
+            <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+              <option value="severity">Severity</option>
+              <option value="active">Active status</option>
+              <option value="type">Rule type</option>
+            </select>
+          </label>
+          <label>
+            Direction
+            <select value={sortDirection} onChange={(event) => setSortDirection(event.target.value)}>
+              <option value="desc">Descending</option>
+              <option value="asc">Ascending</option>
+            </select>
+          </label>
+        </div>
+
         {(severityFilter || searchQuery) && (
           <div className="filter-row" style={{ marginBottom: 12 }}>
             {severityFilter && (
@@ -240,7 +412,7 @@ export default function RulesPage({
             )}
             {searchQuery && (
               <span style={{ fontSize: 'var(--font-sm)', color: 'var(--muted)' }}>
-                Rule: <strong>{searchQuery}</strong>
+                Search: <strong>{searchQuery}</strong>
               </span>
             )}
             <button className="btn btn-small" onClick={() => { setSeverityFilter(''); setSearchQuery(''); }}>
@@ -250,7 +422,7 @@ export default function RulesPage({
         )}
 
         {loading ? <SkeletonLoader rows={6} rowHeight={18} /> : null}
-        {!loading && filteredRules.length === 0 ? (
+        {!loading && filteredSortedRules.length === 0 ? (
           <EmptyState
             icon={<span aria-hidden="true">[!]</span>}
             message={rules.length === 0 ? 'No rules found.' : 'No rules match the current filters.'}
@@ -259,7 +431,7 @@ export default function RulesPage({
           />
         ) : null}
 
-        {!loading && filteredRules.length > 0 ? (
+        {!loading && filteredSortedRules.length > 0 ? (
           <div className="table-container">
             <table className="data-table">
               <thead>
@@ -275,7 +447,7 @@ export default function RulesPage({
                 </tr>
               </thead>
               <tbody>
-                {filteredRules.map((rule) => (
+                {filteredSortedRules.map((rule) => (
                   <tr key={rule.id}>
                     <td data-label="ID">{rule.id}</td>
                     <td data-label="Name">{rule.ruleName}</td>
@@ -293,7 +465,7 @@ export default function RulesPage({
                         <button className="btn btn-small" onClick={() => startEdit(rule)}>
                           Edit
                         </button>
-                        <button className="btn btn-small btn-danger" onClick={() => onDelete(rule.id)}>
+                        <button className="btn btn-small btn-danger" onClick={() => handleDeleteClick(rule)}>
                           Delete
                         </button>
                       </div>
@@ -305,6 +477,21 @@ export default function RulesPage({
           </div>
         ) : null}
       </article>
+
+      <ConfirmDialog
+        isOpen={Boolean(pendingDeleteRule)}
+        title="Delete Rule"
+        message={deleteMessage}
+        confirmLabel={isDeleting ? 'Deleting...' : 'Delete Rule'}
+        cancelLabel="Keep Rule"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => {
+          if (!isDeleting) {
+            setPendingDeleteRule(null);
+          }
+        }}
+        tone="danger"
+      />
     </section>
   );
 }
