@@ -327,7 +327,7 @@ export default function AlertsPage({ transactions, rules }) {
         title="Alerts"
         subtitle={`Realtime backend alerts via /api/alerts (auto-refresh every ${REFRESH_INTERVAL_MS / 1000}s)`}
         action={
-          <button className="btn" onClick={fetchAlerts} disabled={loading}>
+          <button className="btn" type="button" onClick={fetchAlerts} disabled={loading}>
             Refresh Now
           </button>
         }
@@ -345,45 +345,56 @@ export default function AlertsPage({ transactions, rules }) {
         <ErrorState message="Unable to load alerts." error={error} onRetry={fetchAlerts} />
       ) : null}
 
-      <div className="card-grid">
-        <article className="card">
-          <h3>Total Alerts</h3>
-          <strong>{alerts.length}</strong>
-        </article>
-        <article className="card">
-          <h3>Active Alerts</h3>
-          <strong>{activeAlerts.length}</strong>
-        </article>
-      </div>
+      <section aria-labelledby="alerts-summary-heading">
+        <h2 id="alerts-summary-heading" className="sr-only">Alert summary</h2>
+        <div className="card-grid">
+          <article className="card">
+            <h3>Total Alerts</h3>
+            <strong>{alerts.length}</strong>
+          </article>
+          <article className="card">
+            <h3>Active Alerts</h3>
+            <strong>{activeAlerts.length}</strong>
+          </article>
+        </div>
+      </section>
 
-      <div className="card-grid">
-        <article className="card">
-          <h3>Alerts by Severity</h3>
-          <p style={{ fontSize: 'var(--font-xs)', color: 'var(--muted)', margin: '0 0 8px' }}>
-            Click a segment to filter active alerts below
-            {filters.severity !== 'ALL' && (
-              <button
-                className="btn btn-small"
-                style={{ marginLeft: 8 }}
-                onClick={() => handleFilterChange('severity', 'ALL')}
-              >
-                Clear ({filters.severity})
-              </button>
-            )}
-          </p>
-          <SeverityDonutChart items={alerts} onSegmentClick={handleSeveritySegmentClick} />
-        </article>
-        <article className="card">
-          <h3>Alert Lifecycle</h3>
-          <AlertLifecycleFunnel alerts={alerts} />
-        </article>
-      </div>
+      <section aria-labelledby="alerts-analytics-heading">
+        <h2 id="alerts-analytics-heading" className="sr-only">Alert analytics</h2>
+        <div className="card-grid">
+          <article className="card">
+            <h3>Alerts by Severity</h3>
+            <p style={{ fontSize: 'var(--font-xs)', color: 'var(--muted)', margin: '0 0 8px' }}>
+              Click a segment to filter active alerts below
+              {filters.severity !== 'ALL' && (
+                <button
+                  className="btn btn-small"
+                  type="button"
+                  style={{ marginLeft: 8 }}
+                  onClick={() => handleFilterChange('severity', 'ALL')}
+                >
+                  Clear ({filters.severity})
+                </button>
+              )}
+            </p>
+            <SeverityDonutChart items={alerts} onSegmentClick={handleSeveritySegmentClick} />
+          </article>
+          <article className="card">
+            <h3>Alert Lifecycle</h3>
+            <AlertLifecycleFunnel alerts={alerts} />
+          </article>
+        </div>
+      </section>
 
       <article className="panel">
         <h2>Alert Queue</h2>
 
         <div className="filter-row alerts-filter-row">
-          <select value={filters.status} onChange={(event) => handleFilterChange('status', event.target.value)}>
+          <select
+            value={filters.status}
+            onChange={(event) => handleFilterChange('status', event.target.value)}
+            aria-label="Filter alerts by status"
+          >
             {statusOptions.map((status) => (
               <option key={status} value={status}>
                 {status === 'ALL' ? 'All statuses' : status}
@@ -391,7 +402,11 @@ export default function AlertsPage({ transactions, rules }) {
             ))}
           </select>
 
-          <select value={filters.severity} onChange={(event) => handleFilterChange('severity', event.target.value)}>
+          <select
+            value={filters.severity}
+            onChange={(event) => handleFilterChange('severity', event.target.value)}
+            aria-label="Filter alerts by severity"
+          >
             {severityOptions.map((severity) => (
               <option key={severity} value={severity}>
                 {severity === 'ALL' ? 'All severities' : severity}
@@ -399,7 +414,11 @@ export default function AlertsPage({ transactions, rules }) {
             ))}
           </select>
 
-          <select value={filters.ruleType} onChange={(event) => handleFilterChange('ruleType', event.target.value)}>
+          <select
+            value={filters.ruleType}
+            onChange={(event) => handleFilterChange('ruleType', event.target.value)}
+            aria-label="Filter alerts by rule type"
+          >
             {ruleTypeOptions.map((ruleType) => (
               <option key={ruleType} value={ruleType}>
                 {ruleType === 'ALL' ? 'All rule types' : ruleType}
@@ -412,6 +431,7 @@ export default function AlertsPage({ transactions, rules }) {
             placeholder="Transaction reference"
             value={filters.transactionRef}
             onChange={(event) => handleFilterChange('transactionRef', event.target.value)}
+            aria-label="Filter alerts by transaction reference"
           />
 
           <input
@@ -419,6 +439,7 @@ export default function AlertsPage({ transactions, rules }) {
             value={filters.createdFrom}
             onChange={(event) => handleFilterChange('createdFrom', event.target.value)}
             title="Created from"
+            aria-label="Filter alerts created from date and time"
           />
 
           <input
@@ -426,6 +447,7 @@ export default function AlertsPage({ transactions, rules }) {
             value={filters.createdTo}
             onChange={(event) => handleFilterChange('createdTo', event.target.value)}
             title="Created to"
+            aria-label="Filter alerts created to date and time"
           />
 
           <button className="btn btn-secondary" type="button" onClick={clearFilters}>
@@ -433,11 +455,10 @@ export default function AlertsPage({ transactions, rules }) {
           </button>
         </div>
 
-        <div className="alerts-tabs" role="tablist" aria-label="Alert queue views">
+        <div className="alerts-tabs" role="group" aria-label="Alert queue views">
           <button
             type="button"
-            role="tab"
-            aria-selected={activeTab === TAB_ACTIVE_QUEUE}
+            aria-pressed={activeTab === TAB_ACTIVE_QUEUE}
             className={`status-chip ${activeTab === TAB_ACTIVE_QUEUE ? 'status-chip-active' : ''}`}
             onClick={() => setActiveTab(TAB_ACTIVE_QUEUE)}
           >
@@ -445,8 +466,7 @@ export default function AlertsPage({ transactions, rules }) {
           </button>
           <button
             type="button"
-            role="tab"
-            aria-selected={activeTab === TAB_HISTORY}
+            aria-pressed={activeTab === TAB_HISTORY}
             className={`status-chip ${activeTab === TAB_HISTORY ? 'status-chip-active' : ''}`}
             onClick={() => setActiveTab(TAB_HISTORY)}
           >
@@ -475,17 +495,18 @@ export default function AlertsPage({ transactions, rules }) {
         ) : null}
 
         {!loading && visibleAlerts.length > 0 ? (
-          <div className="table-container">
-            <table className="data-table">
+          <div className="table-container table-container--responsive">
+            <table className="data-table data-table--sticky-first-column">
+              <caption className="sr-only">Alert queue table</caption>
               <thead>
                 <tr>
-                  <th>Alert ID</th>
-                  <th>Rule</th>
-                  <th>Severity</th>
-                  <th>Status</th>
-                  <th>Transaction</th>
-                  <th>Created</th>
-                  {activeTab === TAB_ACTIVE_QUEUE ? <th>Actions</th> : null}
+                  <th scope="col">Alert ID</th>
+                  <th scope="col">Rule</th>
+                  <th scope="col">Severity</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Transaction</th>
+                  <th scope="col">Created</th>
+                  {activeTab === TAB_ACTIVE_QUEUE ? <th scope="col">Actions</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -503,6 +524,8 @@ export default function AlertsPage({ transactions, rules }) {
                             className="btn btn-ghost btn-small expand-row-btn"
                             onClick={() => toggleAlertExpansion(alert.id)}
                             aria-expanded={isExpanded}
+                            aria-controls={`alert-details-${alert.id}`}
+                            aria-label={`${isExpanded ? 'Hide' : 'Show'} details for alert ${alert.alertId}`}
                           >
                             {isExpanded ? 'Hide' : 'Show'} {alert.alertId}
                           </button>
@@ -521,6 +544,7 @@ export default function AlertsPage({ transactions, rules }) {
                             <div className="table-actions">
                               <button
                                 className="btn btn-small"
+                                type="button"
                                 disabled={
                                   isUpdatingRow ||
                                   !canTransitionAlert(alert.status, ALERT_STATUS.ACKNOWLEDGED)
@@ -532,6 +556,7 @@ export default function AlertsPage({ transactions, rules }) {
                               </button>
                               <button
                                 className="btn btn-small"
+                                type="button"
                                 disabled={
                                   isUpdatingRow ||
                                   !canTransitionAlert(alert.status, ALERT_STATUS.INVESTIGATING)
@@ -543,6 +568,7 @@ export default function AlertsPage({ transactions, rules }) {
                               </button>
                               <button
                                 className="btn btn-small"
+                                type="button"
                                 disabled={
                                   isUpdatingRow ||
                                   !canTransitionAlert(alert.status, ALERT_STATUS.CLOSED)
@@ -555,6 +581,7 @@ export default function AlertsPage({ transactions, rules }) {
                               </button>
                               <button
                                 className="btn btn-small btn-danger"
+                                type="button"
                                 disabled={
                                   isUpdatingRow ||
                                   !canTransitionAlert(alert.status, ALERT_STATUS.DISMISSED)
@@ -573,6 +600,7 @@ export default function AlertsPage({ transactions, rules }) {
                       {isExpanded ? (
                         <tr key={`${alert.id}-details`} className="alert-details-row">
                           <td
+                            id={`alert-details-${alert.id}`}
                             data-label="Details"
                             colSpan={activeTab === TAB_ACTIVE_QUEUE ? 7 : 6}
                           >

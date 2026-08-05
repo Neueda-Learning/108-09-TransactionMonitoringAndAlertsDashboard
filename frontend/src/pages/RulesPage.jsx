@@ -305,6 +305,7 @@ export default function RulesPage({
               type="button"
               role="switch"
               aria-checked={formState.active}
+              aria-label="Toggle rule active state"
               onClick={() => setFormState((prev) => ({ ...prev, active: !prev.active }))}
             >
               <span className="toggle-switch-track" aria-hidden="true">
@@ -327,54 +328,59 @@ export default function RulesPage({
         </form>
       </article>
 
-      <div className="card-grid">
-        <article className="card">
-          <h3>Rules by Severity</h3>
-          <p style={{ fontSize: 'var(--font-xs)', color: 'var(--muted)', margin: '0 0 8px' }}>
-            Click a segment to filter the rule list below
-            {severityFilter && (
-              <button
-                className="btn btn-small"
-                style={{ marginLeft: 8 }}
-                onClick={() => setSeverityFilter('')}
-              >
-                Clear ({severityFilter})
-              </button>
-            )}
-          </p>
-          <SeverityDonutChart items={rules} onSegmentClick={handleSeveritySegmentClick} />
-          <div className="severity-legend" aria-label="Severity legend">
-            <span className="severity-legend-item">
-              <StatusBadge value="HIGH" />
-              High risk, immediate attention recommended
-            </span>
-            <span className="severity-legend-item">
-              <StatusBadge value="MEDIUM" />
-              Moderate risk, monitor and investigate
-            </span>
-            <span className="severity-legend-item">
-              <StatusBadge value="LOW" />
-              Lower risk, monitor trend impact
-            </span>
-          </div>
-        </article>
-        <article className="card">
-          <h3>Rule Trigger Frequency</h3>
-          <p style={{ fontSize: 'var(--font-xs)', color: 'var(--muted)', margin: '0 0 8px' }}>
-            Click a bar to filter by rule name
-            {searchQuery && (
-              <button
-                className="btn btn-small"
-                style={{ marginLeft: 8 }}
-                onClick={() => setSearchQuery('')}
-              >
-                Clear ("{searchQuery}")
-              </button>
-            )}
-          </p>
-          <RuleTriggerFrequencyChart alerts={alerts || []} rules={rules} onBarClick={handleRuleBarClick} />
-        </article>
-      </div>
+      <section aria-labelledby="rules-analytics-heading">
+        <h2 id="rules-analytics-heading" className="sr-only">Rule analytics</h2>
+        <div className="card-grid">
+          <article className="card">
+            <h3>Rules by Severity</h3>
+            <p style={{ fontSize: 'var(--font-xs)', color: 'var(--muted)', margin: '0 0 8px' }}>
+              Click a segment to filter the rule list below
+              {severityFilter && (
+                <button
+                  className="btn btn-small"
+                  type="button"
+                  style={{ marginLeft: 8 }}
+                  onClick={() => setSeverityFilter('')}
+                >
+                  Clear ({severityFilter})
+                </button>
+              )}
+            </p>
+            <SeverityDonutChart items={rules} onSegmentClick={handleSeveritySegmentClick} />
+            <div className="severity-legend" aria-label="Severity legend">
+              <span className="severity-legend-item">
+                <StatusBadge value="HIGH" />
+                High risk, immediate attention recommended
+              </span>
+              <span className="severity-legend-item">
+                <StatusBadge value="MEDIUM" />
+                Moderate risk, monitor and investigate
+              </span>
+              <span className="severity-legend-item">
+                <StatusBadge value="LOW" />
+                Lower risk, monitor trend impact
+              </span>
+            </div>
+          </article>
+          <article className="card">
+            <h3>Rule Trigger Frequency</h3>
+            <p style={{ fontSize: 'var(--font-xs)', color: 'var(--muted)', margin: '0 0 8px' }}>
+              Click a bar to filter by rule name
+              {searchQuery && (
+                <button
+                  className="btn btn-small"
+                  type="button"
+                  style={{ marginLeft: 8 }}
+                  onClick={() => setSearchQuery('')}
+                >
+                  Clear ("{searchQuery}")
+                </button>
+              )}
+            </p>
+            <RuleTriggerFrequencyChart alerts={alerts || []} rules={rules} onBarClick={handleRuleBarClick} />
+          </article>
+        </div>
+      </section>
 
       <article className="panel">
         <h2>Rule List</h2>
@@ -415,7 +421,7 @@ export default function RulesPage({
                 Search: <strong>{searchQuery}</strong>
               </span>
             )}
-            <button className="btn btn-small" onClick={() => { setSeverityFilter(''); setSearchQuery(''); }}>
+            <button className="btn btn-small" type="button" onClick={() => { setSeverityFilter(''); setSearchQuery(''); }}>
               Clear filters
             </button>
           </div>
@@ -432,18 +438,19 @@ export default function RulesPage({
         ) : null}
 
         {!loading && filteredSortedRules.length > 0 ? (
-          <div className="table-container">
-            <table className="data-table">
+          <div className="table-container table-container--responsive">
+            <table className="data-table data-table--sticky-first-column">
+              <caption className="sr-only">Monitoring rules table</caption>
               <thead>
                 <tr>
-                  <th>ID</th>
-                  <th>Name</th>
-                  <th>Type</th>
-                  <th>Threshold</th>
-                  <th>Window (m)</th>
-                  <th>Severity</th>
-                  <th>Active</th>
-                  <th>Actions</th>
+                  <th scope="col">ID</th>
+                  <th scope="col">Name</th>
+                  <th scope="col">Type</th>
+                  <th scope="col">Threshold</th>
+                  <th scope="col">Window (m)</th>
+                  <th scope="col">Severity</th>
+                  <th scope="col">Active</th>
+                  <th scope="col">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -462,10 +469,10 @@ export default function RulesPage({
                     </td>
                     <td data-label="Actions">
                       <div className="table-actions">
-                        <button className="btn btn-small" onClick={() => startEdit(rule)}>
+                        <button className="btn btn-small" type="button" onClick={() => startEdit(rule)}>
                           Edit
                         </button>
-                        <button className="btn btn-small btn-danger" onClick={() => handleDeleteClick(rule)}>
+                        <button className="btn btn-small btn-danger" type="button" onClick={() => handleDeleteClick(rule)}>
                           Delete
                         </button>
                       </div>

@@ -191,44 +191,50 @@ export default function DashboardPage({ transactions, rules, loading, error, onR
       ) : null}
 
       {/* ── Metric cards ── */}
-      <div className="card-grid" aria-label="Key metrics">
-        <article className="card">
-          <h3>Total Transactions</h3>
-          <strong>
-            {metrics.transactionsCount}
-            <TrendChip direction={trends.transactions} />
-          </strong>
-          <Sparkline data={sparklines.transactions} label="Transaction count trend" height={56} />
-        </article>
-        <article className="card">
-          <h3>Active Rules</h3>
-          <strong>
-            {metrics.activeRules}
-            <TrendChip direction={trends.activeRules} />
-          </strong>
-          <Sparkline data={sparklines.highSeverity} color="var(--color-warn)" label="High-severity rules trend" height={56} />
-        </article>
-        <article className="card">
-          <h3>Transaction Volume</h3>
-          <strong>
-            {fmtMoney(metrics.volume, 'INR')}
-            <TrendChip direction={trends.volume} />
-          </strong>
-          <Sparkline data={sparklines.volume} color="var(--color-success)" label="Transaction volume trend" height={56} />
-        </article>
-      </div>
+      <section aria-labelledby="dashboard-metrics-heading">
+        <h2 id="dashboard-metrics-heading" className="sr-only">Dashboard metrics</h2>
+        <div className="card-grid" aria-label="Key metrics">
+          <article className="card">
+            <h3>Total Transactions</h3>
+            <strong>
+              {metrics.transactionsCount}
+              <TrendChip direction={trends.transactions} />
+            </strong>
+            <Sparkline data={sparklines.transactions} label="Transaction count trend" height={56} />
+          </article>
+          <article className="card">
+            <h3>Active Rules</h3>
+            <strong>
+              {metrics.activeRules}
+              <TrendChip direction={trends.activeRules} />
+            </strong>
+            <Sparkline data={sparklines.highSeverity} color="var(--color-warn)" label="High-severity rules trend" height={56} />
+          </article>
+          <article className="card">
+            <h3>Transaction Volume</h3>
+            <strong>
+              {fmtMoney(metrics.volume, 'INR')}
+              <TrendChip direction={trends.volume} />
+            </strong>
+            <Sparkline data={sparklines.volume} color="var(--color-success)" label="Transaction volume trend" height={56} />
+          </article>
+        </div>
+      </section>
 
       {/* ── Top risk highlights ── */}
-      <div className="card-grid risk-highlights" aria-label="Risk highlights">
-        <article className="card card--risk">
-          <h3>High-Severity Active Rules</h3>
-          <strong className="risk-value">{riskHighlights.highSeverityRules}</strong>
-        </article>
-        <article className="card card--risk">
-          <h3>Pending Transactions</h3>
-          <strong className="risk-value">{riskHighlights.pendingTransactions}</strong>
-        </article>
-      </div>
+      <section aria-labelledby="dashboard-risk-heading">
+        <h2 id="dashboard-risk-heading" className="sr-only">Risk highlights</h2>
+        <div className="card-grid risk-highlights" aria-label="Risk highlights">
+          <article className="card card--risk">
+            <h3>High-Severity Active Rules</h3>
+            <strong className="risk-value">{riskHighlights.highSeverityRules}</strong>
+          </article>
+          <article className="card card--risk">
+            <h3>Pending Transactions</h3>
+            <strong className="risk-value">{riskHighlights.pendingTransactions}</strong>
+          </article>
+        </div>
+      </section>
 
       {/* ── Transaction Volume Chart ── */}
       <article className="panel">
@@ -258,8 +264,9 @@ export default function DashboardPage({ transactions, rules, loading, error, onR
         ) : null}
 
         {!loading && sortedRows.length > 0 ? (
-          <div className="table-container dashboard-table-scroll">
-            <table className="data-table">
+          <div className="table-container table-container--responsive dashboard-table-scroll">
+            <table className="data-table data-table--sticky-first-column">
+              <caption className="sr-only">Recent transactions table</caption>
               <colgroup>
                 {COLUMNS.map((col) => (
                   <col key={col.key} style={{ width: col.width }} />
@@ -275,16 +282,21 @@ export default function DashboardPage({ transactions, rules, loading, error, onR
                     return (
                       <th
                         key={col.key}
+                        scope="col"
                         className={`sortable-th${isActive ? ' sortable-th--active' : ''}`}
                         aria-sort={ariaSortVal}
-                        onClick={() => handleSort(col.key)}
-                        tabIndex={0}
-                        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleSort(col.key)}
                       >
-                        {col.label}
-                        <span className="sort-icon" aria-hidden="true">
-                          {isActive ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ' ⇅'}
-                        </span>
+                        <button
+                          type="button"
+                          className="th-button"
+                          onClick={() => handleSort(col.key)}
+                          aria-label={`Sort by ${col.label}${isActive ? `, currently ${sortDir === 'asc' ? 'ascending' : 'descending'}` : ''}`}
+                        >
+                          {col.label}
+                          <span className="sort-icon" aria-hidden="true">
+                            {isActive ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ' ⇅'}
+                          </span>
+                        </button>
                       </th>
                     );
                   })}
@@ -309,14 +321,17 @@ export default function DashboardPage({ transactions, rules, loading, error, onR
       </article>
 
       {/* ── Quick-link cards ── */}
-      <div className="card-grid" aria-label="Quick navigation">
-        {QUICK_LINKS.map((ql) => (
-          <Link key={ql.to} to={ql.to} className="card card--link">
-            <h3>{ql.label}</h3>
-            <p className="card-link-desc">{ql.description}</p>
-          </Link>
-        ))}
-      </div>
+      <section aria-labelledby="dashboard-quick-links-heading">
+        <h2 id="dashboard-quick-links-heading" className="sr-only">Quick navigation</h2>
+        <div className="card-grid" aria-label="Quick navigation">
+          {QUICK_LINKS.map((ql) => (
+            <Link key={ql.to} to={ql.to} className="card card--link">
+              <h3>{ql.label}</h3>
+              <p className="card-link-desc">{ql.description}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
     </section>
   );
 }

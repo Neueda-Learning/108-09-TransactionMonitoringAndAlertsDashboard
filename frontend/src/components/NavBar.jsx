@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 
 const links = [
@@ -23,6 +23,7 @@ export default function NavBar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const mobileNavTitleId = useId();
   const menuButtonRef = useRef(null);
   const mobilePanelRef = useRef(null);
 
@@ -182,13 +183,14 @@ export default function NavBar() {
         role="dialog"
         aria-modal="true"
         aria-hidden={!isMobileMenuOpen}
-        aria-label="Mobile navigation"
+        aria-labelledby={mobileNavTitleId}
       >
         <div className="mobile-nav-header">
-          <strong className="mobile-nav-title">Menu</strong>
+          <strong id={mobileNavTitleId} className="mobile-nav-title">Menu</strong>
           <button
             type="button"
             className="btn btn-ghost btn-small"
+            aria-label="Close navigation menu"
             onClick={() => {
               setIsMobileMenuOpen(false);
               requestAnimationFrame(() => menuButtonRef.current?.focus());

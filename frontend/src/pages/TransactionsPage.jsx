@@ -518,11 +518,13 @@ export default function TransactionsPage({
             placeholder="Search transaction ID, payee, description"
             value={filters.query}
             onChange={(event) => handleFilterChange('query', event.target.value)}
+            aria-label="Search transactions by ID, payee, or description"
           />
 
           <select
             value={filters.accountId}
             onChange={(event) => handleFilterChange('accountId', event.target.value)}
+            aria-label="Filter transactions by account"
           >
             <option value="">All Accounts</option>
             {accounts.map((account) => (
@@ -535,6 +537,7 @@ export default function TransactionsPage({
           <select
             value={filters.transactionType}
             onChange={(event) => handleFilterChange('transactionType', event.target.value)}
+            aria-label="Filter transactions by type"
           >
             <option value="ALL">All Types</option>
             <option value="DEBIT">DEBIT</option>
@@ -548,6 +551,7 @@ export default function TransactionsPage({
             placeholder="Min amount"
             value={filters.amountMin}
             onChange={(event) => handleFilterChange('amountMin', event.target.value)}
+            aria-label="Filter transactions by minimum amount"
           />
 
           <input
@@ -557,18 +561,21 @@ export default function TransactionsPage({
             placeholder="Max amount"
             value={filters.amountMax}
             onChange={(event) => handleFilterChange('amountMax', event.target.value)}
+            aria-label="Filter transactions by maximum amount"
           />
 
           <input
             type="date"
             value={filters.dateFrom}
             onChange={(event) => handleFilterChange('dateFrom', event.target.value)}
+            aria-label="Filter transactions from date"
           />
 
           <input
             type="date"
             value={filters.dateTo}
             onChange={(event) => handleFilterChange('dateTo', event.target.value)}
+            aria-label="Filter transactions to date"
           />
         </div>
 
@@ -617,14 +624,23 @@ export default function TransactionsPage({
 
         {!loading && sortedTransactions.length > 0 ? (
           <>
-            <div className="table-container transactions-table-container">
-              <table className="data-table transactions-table">
+            <div className="table-container table-container--responsive transactions-table-container">
+              <table className="data-table data-table--sticky-first-column transactions-table">
+                <caption className="sr-only">Transactions table</caption>
                 <thead>
                   <tr>
                     {sortableColumns.map(({ key, label }) => (
                       <th
                         key={key}
+                        scope="col"
                         className={sortConfig.key === key ? 'sortable-th sortable-th--active' : 'sortable-th'}
+                        aria-sort={
+                          sortConfig.key === key
+                            ? sortConfig.direction === 'asc'
+                              ? 'ascending'
+                              : 'descending'
+                            : 'none'
+                        }
                       >
                         <button
                           type="button"
@@ -639,7 +655,7 @@ export default function TransactionsPage({
                         </button>
                       </th>
                     ))}
-                    <th>Actions</th>
+                    <th scope="col">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
