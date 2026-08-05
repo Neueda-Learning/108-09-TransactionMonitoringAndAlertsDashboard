@@ -10,7 +10,10 @@ export default function StatusBadge({ value }) {
     MEDIUM: 'badge badge-medium',
     LOW: 'badge badge-low',
     ACTIVE: 'badge badge-active',
-    INACTIVE: 'badge badge-inactive'
+    INACTIVE: 'badge badge-inactive',
+    COMPLETED: 'badge badge-completed',
+    PENDING: 'badge badge-pending',
+    FAILED: 'badge badge-failed'
   };
 
   const className = map[normalized] || 'badge';
