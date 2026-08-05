@@ -288,34 +288,36 @@ export default function AlertsPage({ transactions, rules, onNotify }) {
           <div className="empty-state"><div className="empty-icon">&#128737;</div><p>No active alerts - all clear!</p></div>
         ) : null}
         {!loading && activeAlerts.length > 0 ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Alert ID</th><th>Rule</th><th>Severity</th><th>Status</th>
-                <th>Transaction</th><th>Created</th><th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {activeAlerts.map((alert) => (
-                <tr key={alert.id}>
-                  <td style={{ fontFamily: 'monospace', fontSize: 13, color: '#7ab2ff' }}>{alert.alertId}</td>
-                  <td style={{ fontWeight: 600, color: '#e8edf8' }}>{alert.ruleName}</td>
-                  <td><StatusBadge value={alert.severity} /></td>
-                  <td><StatusBadge value={alert.status} /></td>
-                  <td style={{ fontFamily: 'monospace', fontSize: 12, color: '#6b7da8' }}>{alert.transactionRef}</td>
-                  <td style={{ color: '#6b7da8', fontSize: 13 }}>{formatDateTime(alert.createdAt)}</td>
-                  <td>
-                    <div className="table-actions">
-                      <button className="btn btn-small" disabled={isUpdatingStatus || !canTransitionAlert(alert.status, ALERT_STATUS.ACKNOWLEDGED)} onClick={() => transitionAlert(alert, ALERT_STATUS.ACKNOWLEDGED)}>Acknowledge</button>
-                      <button className="btn btn-small" disabled={isUpdatingStatus || !canTransitionAlert(alert.status, ALERT_STATUS.INVESTIGATING)} onClick={() => transitionAlert(alert, ALERT_STATUS.INVESTIGATING)}>Investigate</button>
-                      <button className="btn btn-small" disabled={isUpdatingStatus || !canTransitionAlert(alert.status, ALERT_STATUS.CLOSED)} onClick={() => transitionAlert(alert, ALERT_STATUS.CLOSED)}>Close</button>
-                      <button className="btn btn-small btn-danger" disabled={isUpdatingStatus || !canTransitionAlert(alert.status, ALERT_STATUS.DISMISSED)} onClick={() => transitionAlert(alert, ALERT_STATUS.DISMISSED)}>Dismiss</button>
-                    </div>
-                  </td>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Alert ID</th><th>Rule</th><th>Severity</th><th>Status</th>
+                  <th>Transaction</th><th>Created</th><th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {activeAlerts.map((alert) => (
+                  <tr key={alert.id}>
+                    <td style={{ fontFamily: 'monospace', fontSize: 13, color: '#7ab2ff' }}>{alert.alertId}</td>
+                    <td style={{ fontWeight: 600, color: '#e8edf8' }}>{alert.ruleName}</td>
+                    <td><StatusBadge value={alert.severity} /></td>
+                    <td><StatusBadge value={alert.status} /></td>
+                    <td style={{ fontFamily: 'monospace', fontSize: 12, color: '#6b7da8' }}>{alert.transactionRef}</td>
+                    <td style={{ color: '#6b7da8', fontSize: 13 }}>{formatDateTime(alert.createdAt)}</td>
+                    <td>
+                      <div className="table-actions">
+                        <button className="btn btn-small" disabled={isUpdatingStatus || !canTransitionAlert(alert.status, ALERT_STATUS.ACKNOWLEDGED)} onClick={() => transitionAlert(alert, ALERT_STATUS.ACKNOWLEDGED)}>Acknowledge</button>
+                        <button className="btn btn-small" disabled={isUpdatingStatus || !canTransitionAlert(alert.status, ALERT_STATUS.INVESTIGATING)} onClick={() => transitionAlert(alert, ALERT_STATUS.INVESTIGATING)}>Investigate</button>
+                        <button className="btn btn-small" disabled={isUpdatingStatus || !canTransitionAlert(alert.status, ALERT_STATUS.CLOSED)} onClick={() => transitionAlert(alert, ALERT_STATUS.CLOSED)}>Close</button>
+                        <button className="btn btn-small btn-danger" disabled={isUpdatingStatus || !canTransitionAlert(alert.status, ALERT_STATUS.DISMISSED)} onClick={() => transitionAlert(alert, ALERT_STATUS.DISMISSED)}>Dismiss</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : null}
       </article>
 
@@ -326,21 +328,23 @@ export default function AlertsPage({ transactions, rules, onNotify }) {
           <div className="empty-state"><div className="empty-icon">&#128203;</div><p>No history yet.</p></div>
         ) : null}
         {!loading && alerts.length > 0 ? (
-          <table className="data-table">
-            <thead>
-              <tr><th>Alert ID</th><th>Status</th><th>Updated At</th><th>Reason</th></tr>
-            </thead>
-            <tbody>
-              {alerts.map((alert) => (
-                <tr key={`history-${alert.id}`}>
-                  <td style={{ fontFamily: 'monospace', fontSize: 13, color: '#7ab2ff' }}>{alert.alertId}</td>
-                  <td><StatusBadge value={alert.status} /></td>
-                  <td style={{ color: '#6b7da8', fontSize: 13 }}>{formatDateTime(alert.updatedAt)}</td>
-                  <td style={{ color: '#b0bcd8', fontSize: 13 }}>{alert.reason}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr><th>Alert ID</th><th>Status</th><th>Updated At</th><th>Reason</th></tr>
+              </thead>
+              <tbody>
+                {alerts.map((alert) => (
+                  <tr key={`history-${alert.id}`}>
+                    <td style={{ fontFamily: 'monospace', fontSize: 13, color: '#7ab2ff' }}>{alert.alertId}</td>
+                    <td><StatusBadge value={alert.status} /></td>
+                    <td style={{ color: '#6b7da8', fontSize: 13 }}>{formatDateTime(alert.updatedAt)}</td>
+                    <td style={{ color: '#b0bcd8', fontSize: 13 }}>{alert.reason}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : null}
       </article>
     </section>

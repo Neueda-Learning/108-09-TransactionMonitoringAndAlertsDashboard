@@ -245,33 +245,35 @@ export default function RulesPage({ rules, loading, error, onCreate, onUpdate, o
           <div className="empty-state"><div className="empty-icon">&#9881;</div><p>No rules found. Add your first rule above.</p></div>
         ) : null}
         {!loading && rules.length > 0 ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>ID</th><th>Name</th><th>Type</th><th>Threshold</th>
-                <th>Window (m)</th><th>Severity</th><th>Active</th><th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rules.map((rule) => (
-                <tr key={rule.id}>
-                  <td style={{ color: '#6b7da8', fontSize: 13 }}>{rule.id}</td>
-                  <td style={{ fontWeight: 600, color: '#e8edf8' }}>{rule.ruleName}</td>
-                  <td style={{ fontFamily: 'monospace', fontSize: 12, color: '#7ab2ff' }}>{rule.ruleType}</td>
-                  <td>{rule.threshold ?? '-'}</td>
-                  <td>{rule.timeWindowMinutes ?? '-'}</td>
-                  <td><StatusBadge value={rule.severity} /></td>
-                  <td><StatusBadge value={rule.active ? 'ACTIVE' : 'INACTIVE'} /></td>
-                  <td>
-                    <div className="table-actions">
-                      <button className="btn btn-small" onClick={() => startEdit(rule)}>Edit</button>
-                      <button className="btn btn-small btn-danger" onClick={() => onDelete(rule.id)}>Delete</button>
-                    </div>
-                  </td>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th><th>Name</th><th>Type</th><th>Threshold</th>
+                  <th>Window (m)</th><th>Severity</th><th>Active</th><th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rules.map((rule) => (
+                  <tr key={rule.id}>
+                    <td style={{ color: '#6b7da8', fontSize: 13 }}>{rule.id}</td>
+                    <td style={{ fontWeight: 600, color: '#e8edf8' }}>{rule.ruleName}</td>
+                    <td style={{ fontFamily: 'monospace', fontSize: 12, color: '#7ab2ff' }}>{rule.ruleType}</td>
+                    <td>{rule.threshold ?? '-'}</td>
+                    <td>{rule.timeWindowMinutes ?? '-'}</td>
+                    <td><StatusBadge value={rule.severity} /></td>
+                    <td><StatusBadge value={rule.active ? 'ACTIVE' : 'INACTIVE'} /></td>
+                    <td>
+                      <div className="table-actions">
+                        <button className="btn btn-small" onClick={() => startEdit(rule)}>Edit</button>
+                        <button className="btn btn-small btn-danger" onClick={() => onDelete(rule.id)}>Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : null}
       </article>
     </section>

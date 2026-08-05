@@ -195,7 +195,7 @@ export default function TransactionsPage({
       {/* ── CHARTS ── */}
       {transactions.length > 0 && (
         <div className="chart-grid">
-          <div className="chart-panel" style={{ gridColumn: 'span 2' }}>
+          <div className="chart-panel chart-panel-span-2">
             <h3><span className="dot"></span>Daily Transaction Amount</h3>
             <ResponsiveContainer width="100%" height={200}>
               <AreaChart data={amountByDay} margin={{ top: 4, right: 10, left: 0, bottom: 0 }}>
@@ -401,57 +401,59 @@ export default function TransactionsPage({
         ) : null}
 
         {!loading && filteredTransactions.length > 0 ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Transaction ID</th>
-                <th>Account</th>
-                <th>Payee</th>
-                <th>Payee Name</th>
-                <th>Amount</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th>Time</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredTransactions.map((tx) => (
-                <tr key={tx.id || tx.transactionId}>
-                  <td style={{ fontFamily: 'monospace', fontSize: 13, color: '#7ab2ff' }}>{tx.transactionId}</td>
-                  <td>{tx.accountId}</td>
-                  <td style={{ color: '#b0bcd8', fontSize: 13 }}>{tx.payeeId}</td>
-                  <td>{tx.payeeName || '-'}</td>
-                  <td style={{ fontWeight: 600 }}>{formatMoney(tx.amount, tx.currency || 'USD')}</td>
-                  <td>
-                    <span style={{
-                      fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 999,
-                      background: tx.transactionType === 'DEBIT' ? 'rgba(244,63,94,0.15)' : 'rgba(0,196,140,0.15)',
-                      color: tx.transactionType === 'DEBIT' ? '#ff7089' : '#00c48c',
-                      border: `1px solid ${tx.transactionType === 'DEBIT' ? 'rgba(244,63,94,0.3)' : 'rgba(0,196,140,0.3)'}`
-                    }}>{tx.transactionType}</span>
-                  </td>
-                  <td>
-                    <StatusBadge value={tx.status} />
-                  </td>
-                  <td style={{ color: '#6b7da8', fontSize: 13 }}>{formatDateTime(tx.transactionTime)}</td>
-                  <td>
-                    <div className="table-actions">
-                      <button className="btn btn-small" onClick={() => startEdit(tx)}>
-                        Edit
-                      </button>
-                      <button
-                        className="btn btn-small btn-danger"
-                        onClick={() => onDelete(tx.transactionId)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Transaction ID</th>
+                  <th>Account</th>
+                  <th>Payee</th>
+                  <th>Payee Name</th>
+                  <th>Amount</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Time</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredTransactions.map((tx) => (
+                  <tr key={tx.id || tx.transactionId}>
+                    <td style={{ fontFamily: 'monospace', fontSize: 13, color: '#7ab2ff' }}>{tx.transactionId}</td>
+                    <td>{tx.accountId}</td>
+                    <td style={{ color: '#b0bcd8', fontSize: 13 }}>{tx.payeeId}</td>
+                    <td>{tx.payeeName || '-'}</td>
+                    <td style={{ fontWeight: 600 }}>{formatMoney(tx.amount, tx.currency || 'USD')}</td>
+                    <td>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 999,
+                        background: tx.transactionType === 'DEBIT' ? 'rgba(244,63,94,0.15)' : 'rgba(0,196,140,0.15)',
+                        color: tx.transactionType === 'DEBIT' ? '#ff7089' : '#00c48c',
+                        border: `1px solid ${tx.transactionType === 'DEBIT' ? 'rgba(244,63,94,0.3)' : 'rgba(0,196,140,0.3)'}`
+                      }}>{tx.transactionType}</span>
+                    </td>
+                    <td>
+                      <StatusBadge value={tx.status} />
+                    </td>
+                    <td style={{ color: '#6b7da8', fontSize: 13 }}>{formatDateTime(tx.transactionTime)}</td>
+                    <td>
+                      <div className="table-actions">
+                        <button className="btn btn-small" onClick={() => startEdit(tx)}>
+                          Edit
+                        </button>
+                        <button
+                          className="btn btn-small btn-danger"
+                          onClick={() => onDelete(tx.transactionId)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : null}
       </article>
     </section>

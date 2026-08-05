@@ -61,6 +61,20 @@ body::before {
   z-index: 1;
 }
 
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chart-grid-split {
+  grid-template-columns: 2fr 1fr;
+}
+
+.chart-panel-span-2 {
+  grid-column: span 2;
+}
+
 .app-shell {
   min-height: 100vh;
 }
@@ -82,6 +96,7 @@ body::before {
   align-items: center;
   justify-content: space-between;
   padding: 0;
+  gap: 12px;
   height: 64px;
 }
 
@@ -112,6 +127,7 @@ body::before {
   display: flex;
   gap: 4px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .nav-link {
@@ -161,6 +177,17 @@ body::before {
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 24px;
+}
+
+.page-header-main {
+  min-width: 0;
+}
+
+.page-header-action {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .page-header h1 {
@@ -275,6 +302,7 @@ body::before {
 .panel {
   padding: 22px 24px;
   margin-bottom: 24px;
+  overflow: hidden;
 }
 
 .panel h2 {
@@ -543,6 +571,7 @@ select option {
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 /* ═══════════════════ BUTTONS ═══════════════════ */
@@ -624,6 +653,7 @@ select option {
 .data-table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 760px;
 }
 
 .data-table th,
@@ -875,6 +905,10 @@ select option {
 
 /* ═══════════════════ MEDIA QUERIES ═══════════════════ */
 @media (max-width: 900px) {
+  .container {
+    width: min(1280px, 96vw);
+  }
+
   .notification-stack {
     top: 138px;
     right: 12px;
@@ -898,7 +932,134 @@ select option {
     padding: 12px 0;
   }
 
+  .nav-links {
+    width: 100%;
+  }
+
   .chart-grid {
     grid-template-columns: 1fr;
+  }
+
+  .chart-grid-split {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-panel-span-2 {
+    grid-column: auto;
+  }
+
+  .card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+
+  .panel,
+  .chart-panel,
+  .card {
+    padding: 18px;
+  }
+
+  .main-content {
+    padding: 20px 0 28px;
+  }
+}
+
+@media (max-width: 700px) {
+  .brand {
+    font-size: 16px;
+  }
+
+  .nav-link {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .page-header-action {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .page-header-action .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .page-header h1 {
+    font-size: 22px;
+  }
+
+  .card strong {
+    font-size: 28px;
+  }
+
+  .chart-panel {
+    min-height: 250px;
+  }
+
+  .filter-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-row input,
+  .filter-row select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .actions-row {
+    width: 100%;
+  }
+
+  .actions-row .btn {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+
+  .notification {
+    padding: 12px 13px;
+    gap: 10px;
+  }
+}
+
+@media (max-width: 560px) {
+  .topbar {
+    position: static;
+  }
+
+  .notification-stack {
+    top: 10px;
+  }
+
+  .card-grid,
+  .chart-grid {
+    gap: 12px;
+  }
+
+  .panel,
+  .chart-panel,
+  .card {
+    padding: 14px;
+    border-radius: 12px;
+  }
+
+  .card-icon {
+    width: 34px;
+    height: 34px;
+    font-size: 17px;
+    right: 12px;
+    top: 12px;
+  }
+
+  .card strong {
+    font-size: 24px;
+  }
+
+  .data-table {
+    min-width: 640px;
   }
 }

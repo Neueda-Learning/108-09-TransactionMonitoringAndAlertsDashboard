@@ -163,7 +163,7 @@ export default function DashboardPage({ transactions, rules, loading, error }) {
 
       {/* ── CHARTS ROW ── */}
       {transactions.length > 0 && (
-        <div className="chart-grid" style={{ gridTemplateColumns: '2fr 1fr' }}>
+        <div className="chart-grid chart-grid-split">
           {/* Volume area chart */}
           <div className="chart-panel">
             <h3><span className="dot"></span>Transaction Volume Over Time</h3>
@@ -279,30 +279,32 @@ export default function DashboardPage({ transactions, rules, loading, error }) {
         ) : null}
 
         {!loading && recentTransactions.length > 0 ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Transaction ID</th>
-                <th>Account</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th>Time (MM/DD/YYYY)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentTransactions.map((tx) => (
-                <tr key={tx.id || tx.transactionId}>
-                  <td style={{ fontFamily: 'monospace', fontSize: 13, color: '#7ab2ff' }}>{tx.transactionId}</td>
-                  <td>{tx.accountId}</td>
-                  <td style={{ fontWeight: 600 }}>{formatMoney(tx.amount, tx.currency || 'USD')}</td>
-                  <td>
-                    <StatusBadge value={tx.status} />
-                  </td>
-                  <td style={{ color: '#6b7da8', fontSize: 13 }}>{formatDateTime(tx.transactionTime)}</td>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Transaction ID</th>
+                  <th>Account</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Time (MM/DD/YYYY)</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {recentTransactions.map((tx) => (
+                  <tr key={tx.id || tx.transactionId}>
+                    <td style={{ fontFamily: 'monospace', fontSize: 13, color: '#7ab2ff' }}>{tx.transactionId}</td>
+                    <td>{tx.accountId}</td>
+                    <td style={{ fontWeight: 600 }}>{formatMoney(tx.amount, tx.currency || 'USD')}</td>
+                    <td>
+                      <StatusBadge value={tx.status} />
+                    </td>
+                    <td style={{ color: '#6b7da8', fontSize: 13 }}>{formatDateTime(tx.transactionTime)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : null}
       </article>
     </section>
