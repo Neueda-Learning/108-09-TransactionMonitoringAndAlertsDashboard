@@ -8,21 +8,31 @@ import com.neueda.repository.TransactionRepository;
 import com.neueda.ruleengine.RuleEngine;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 public class TransactionService {
 
+    private static final long DEFAULT_SDN_RULE_ID = -1L;
+    private static final String DEFAULT_SDN_RULE_NAME = "Built-in SDN Screening Rule";
+    private static final String DEFAULT_SDN_RULE_TYPE = "SDN_SCREENING";
+    private static final String DEFAULT_SDN_SEVERITY = "HIGH";
+
     private final TransactionRepository repository;
     private final RuleRepository ruleRepository;
     private final AlertService alertService;
+    private final SdnScreeningService sdnScreeningService;
 
     public TransactionService(TransactionRepository repository,
                               RuleRepository ruleRepository,
-                              AlertService alertService) {
+                              AlertService alertService,
+                              SdnScreeningService sdnScreeningService) {
         this.repository = repository;
         this.ruleRepository = ruleRepository;
         this.alertService = alertService;
+        this.sdnScreeningService = sdnScreeningService;
     }
 
     // Get all transactions
@@ -40,12 +50,12 @@ public class TransactionService {
     public Transaction addTransaction(Transaction transaction) {
         Transaction savedTransaction = repository.save(transaction);
 
-        List<Rule> activeRules = ruleRepository.findByActiveTrue();
+        List<Rule> activeRules = ensureBuiltInSdnRule(ruleRepository.findByActiveTrue());
         if (activeRules.isEmpty()) {
             return savedTransaction;
         }
 
-        RuleEngine ruleEngine = new RuleEngine(activeRules);
+        RuleEngine ruleEngine = new RuleEngine(activeRules, sdnScreeningService);
         List<Transaction> accountHistory = repository.findByAccountId(savedTransaction.getAccountId());
         List<com.neueda.ruleengine.Rule.EvaluationResult> triggeredResults =
                 ruleEngine.evaluateTriggered(savedTransaction, accountHistory);
@@ -61,6 +71,45 @@ public class TransactionService {
         return savedTransaction;
     }
 
+    private List<Rule> ensureBuiltInSdnRule(final List<Rule> activeRules) {
+        final List<Rule> resolvedRules = new ArrayList<>();
+        if (activeRules != null) {
+            resolvedRules.addAll(activeRules);
+        }
+
+        boolean hasSdnRule = false;
+        for (Rule rule : resolvedRules) {
+            if (rule != null && isSdnRuleType(rule.getRuleType())) {
+                hasSdnRule = true;
+                break;
+            }
+        }
+
+        if (!hasSdnRule) {
+            Rule builtInSdnRule = new Rule();
+            builtInSdnRule.setId(DEFAULT_SDN_RULE_ID);
+            builtInSdnRule.setRuleName(DEFAULT_SDN_RULE_NAME);
+            builtInSdnRule.setRuleType(DEFAULT_SDN_RULE_TYPE);
+            builtInSdnRule.setSeverity(DEFAULT_SDN_SEVERITY);
+            builtInSdnRule.setThreshold(1.0d);
+            builtInSdnRule.setActive(true);
+            resolvedRules.add(builtInSdnRule);
+        }
+
+        return resolvedRules;
+    }
+
+    private boolean isSdnRuleType(final String ruleType) {
+        if (ruleType == null || ruleType.trim().isEmpty()) {
+            return false;
+        }
+        final String normalized = ruleType.trim().toUpperCase(Locale.ROOT);
+        return normalized.equals(DEFAULT_SDN_RULE_TYPE)
+                || normalized.equals("SDN")
+                || normalized.equals("SDN_RULE")
+                || normalized.equals("SANCTIONS");
+    }
+
     // Update transaction
     public Transaction updateTransaction(String transactionId, Transaction updatedTransaction) {
 
@@ -69,6 +118,7 @@ public class TransactionService {
 
         existingTransaction.setAccountId(updatedTransaction.getAccountId());
         existingTransaction.setPayeeId(updatedTransaction.getPayeeId());
+        existingTransaction.setPayeeName(updatedTransaction.getPayeeName());
         existingTransaction.setAmount(updatedTransaction.getAmount());
         existingTransaction.setCurrency(updatedTransaction.getCurrency());
         existingTransaction.setTransactionType(updatedTransaction.getTransactionType());

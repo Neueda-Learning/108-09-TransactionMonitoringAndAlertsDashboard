@@ -12,7 +12,8 @@ export const RULE_TYPES = [
   'AMOUNT_THRESHOLD',
   'VELOCITY',
   'NEW_PAYEE',
-  'DAILY_LIMIT'
+  'DAILY_LIMIT',
+  'SDN_SCREENING'
 ];
 
 export const SEVERITIES = ['LOW', 'MEDIUM', 'HIGH'];

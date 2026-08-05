@@ -20,6 +20,9 @@ public class Transaction {
     @Column(name = "payee_id", nullable = false)
     private String payeeId;
 
+    @Column(name = "payee_name")
+    private String payeeName;
+
     @Column(nullable = false)
     private Double amount;
 
@@ -47,6 +50,7 @@ public class Transaction {
                        String transactionId,
                        String accountId,
                        String payeeId,
+                       String payeeName,
                        Double amount,
                        String currency,
                        String transactionType,
@@ -58,6 +62,7 @@ public class Transaction {
         this.transactionId = transactionId;
         this.accountId = accountId;
         this.payeeId = payeeId;
+        this.payeeName = payeeName;
         this.amount = amount;
         this.currency = currency;
         this.transactionType = transactionType;
@@ -98,6 +103,14 @@ public class Transaction {
 
     public void setPayeeId(String payeeId) {
         this.payeeId = payeeId;
+    }
+
+    public String getPayeeName() {
+        return payeeName;
+    }
+
+    public void setPayeeName(String payeeName) {
+        this.payeeName = payeeName;
     }
 
     public Double getAmount() {

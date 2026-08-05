@@ -1,6 +1,7 @@
 package com.neueda.ruleengine;
 
 import com.neueda.entity.Transaction;
+import com.neueda.service.SdnScreeningService;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -10,8 +11,11 @@ public class RuleEngine {
 
 	private final List<Rule> rules;
 
-	public RuleEngine(final List<com.neueda.entity.Rule> configurations) {
-		this.rules = buildRules(configurations);
+	public RuleEngine(
+			final List<com.neueda.entity.Rule> configurations,
+			final SdnScreeningService sdnScreeningService
+	) {
+		this.rules = buildRules(configurations, sdnScreeningService);
 	}
 
 	public List<Rule.EvaluationResult> evaluateAll(
@@ -43,14 +47,17 @@ public class RuleEngine {
 		return Collections.unmodifiableList(rules);
 	}
 
-	private static List<Rule> buildRules(final List<com.neueda.entity.Rule> configurations) {
+	private static List<Rule> buildRules(
+			final List<com.neueda.entity.Rule> configurations,
+			final SdnScreeningService sdnScreeningService
+	) {
 		final List<Rule> resolvedRules = new ArrayList<>();
 		if (configurations == null || configurations.isEmpty()) {
 			return resolvedRules;
 		}
 
 		for (final com.neueda.entity.Rule configuration : configurations) {
-			final Rule rule = createRule(configuration);
+			final Rule rule = createRule(configuration, sdnScreeningService);
 			if (rule != null) {
 				resolvedRules.add(rule);
 			}
@@ -59,7 +66,10 @@ public class RuleEngine {
 		return resolvedRules;
 	}
 
-	private static Rule createRule(final com.neueda.entity.Rule configuration) {
+	private static Rule createRule(
+			final com.neueda.entity.Rule configuration,
+			final SdnScreeningService sdnScreeningService
+	) {
 		if (configuration == null || configuration.getRuleType() == null) {
 			return null;
 		}
@@ -70,6 +80,7 @@ public class RuleEngine {
 			case "DAILY_LIMIT", "DAILY_LIMIT_RULE", "DAILY" -> new DailyLimitRule(configuration);
 			case "VELOCITY", "VELOCITY_RULE" -> new VelocityRule(configuration);
 			case "NEW_PAYEE", "NEW_PAYEE_RULE" -> new NewPayeeRule(configuration);
+			case "SDN", "SDN_RULE", "SDN_SCREENING", "SANCTIONS" -> new SdnPayeeRule(configuration, sdnScreeningService);
 			default -> null;
 		};
 	}

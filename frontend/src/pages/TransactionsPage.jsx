@@ -7,6 +7,7 @@ const defaultForm = {
   transactionId: '',
   accountId: '',
   payeeId: '',
+  payeeName: '',
   amount: '',
   currency: 'INR',
   transactionType: 'DEBIT',
@@ -48,7 +49,8 @@ export default function TransactionsPage({
       const queryMatch =
         tx.transactionId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         tx.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        tx.payeeId?.toLowerCase().includes(searchTerm.toLowerCase());
+        tx.payeeId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        tx.payeeName?.toLowerCase().includes(searchTerm.toLowerCase());
 
       const statusMatch = statusFilter === 'ALL' || tx.status === statusFilter;
       const accountMatch = !accountFilter || tx.accountId === accountFilter;
@@ -68,6 +70,7 @@ export default function TransactionsPage({
       transactionId: tx.transactionId || '',
       accountId: tx.accountId || '',
       payeeId: tx.payeeId || '',
+      payeeName: tx.payeeName || '',
       amount: tx.amount ?? '',
       currency: tx.currency || 'INR',
       transactionType: tx.transactionType || 'DEBIT',
@@ -130,6 +133,13 @@ export default function TransactionsPage({
               required
               value={formState.payeeId}
               onChange={(event) => setFormState((prev) => ({ ...prev, payeeId: event.target.value }))}
+            />
+          </label>
+          <label>
+            Payee Name
+            <input
+              value={formState.payeeName}
+              onChange={(event) => setFormState((prev) => ({ ...prev, payeeName: event.target.value }))}
             />
           </label>
           <label>
@@ -211,7 +221,7 @@ export default function TransactionsPage({
 
         <div className="filter-row">
           <input
-            placeholder="Search transaction ID, payee, description"
+            placeholder="Search transaction ID, payee, payee name, description"
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
           />
@@ -241,6 +251,7 @@ export default function TransactionsPage({
                 <th>Transaction ID</th>
                 <th>Account</th>
                 <th>Payee</th>
+                <th>Payee Name</th>
                 <th>Amount</th>
                 <th>Type</th>
                 <th>Status</th>
@@ -254,6 +265,7 @@ export default function TransactionsPage({
                   <td>{tx.transactionId}</td>
                   <td>{tx.accountId}</td>
                   <td>{tx.payeeId}</td>
+                  <td>{tx.payeeName || '-'}</td>
                   <td>{formatMoney(tx.amount, tx.currency || 'USD')}</td>
                   <td>{tx.transactionType}</td>
                   <td>
