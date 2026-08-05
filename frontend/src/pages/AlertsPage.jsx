@@ -9,6 +9,8 @@ import { ALERT_STATUS } from '../constants';
 import { alertsApi } from '../api/alertsApi';
 import { canTransitionAlert } from '../utils/alerts';
 import { formatDateTime } from '../utils/formatters';
+import SeverityDonutChart from '../components/charts/SeverityDonutChart';
+import AlertLifecycleFunnel from '../components/charts/AlertLifecycleFunnel';
 
 const REFRESH_INTERVAL_MS = Number(process.env.REACT_APP_ALERTS_POLL_MS || 3000);
 
@@ -40,6 +42,7 @@ export default function AlertsPage({ transactions, rules }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [severityFilter, setSeverityFilter] = useState('');
   const { toastSuccess, toastError } = useToast();
 
   const fetchAlerts = useCallback(async () => {
@@ -95,6 +98,18 @@ export default function AlertsPage({ transactions, rules }) {
     [alerts]
   );
 
+  const filteredActiveAlerts = useMemo(
+    () =>
+      severityFilter
+        ? activeAlerts.filter((a) => (a.severity || '').toUpperCase() === severityFilter)
+        : activeAlerts,
+    [activeAlerts, severityFilter]
+  );
+
+  function handleSeveritySegmentClick(severity) {
+    setSeverityFilter((prev) => (prev === severity ? '' : severity));
+  }
+
   async function transitionAlert(alert, targetStatus) {
     if (!canTransitionAlert(alert.status, targetStatus)) {
       return;
@@ -142,20 +157,53 @@ export default function AlertsPage({ transactions, rules }) {
         </article>
       </div>
 
+      <div className="card-grid">
+        <article className="card">
+          <h3>Alerts by Severity</h3>
+          <p style={{ fontSize: 'var(--font-xs)', color: 'var(--muted)', margin: '0 0 8px' }}>
+            Click a segment to filter active alerts below
+            {severityFilter && (
+              <button
+                className="btn btn-small"
+                style={{ marginLeft: 8 }}
+                onClick={() => setSeverityFilter('')}
+              >
+                Clear ({severityFilter})
+              </button>
+            )}
+          </p>
+          <SeverityDonutChart items={alerts} onSegmentClick={handleSeveritySegmentClick} />
+        </article>
+        <article className="card">
+          <h3>Alert Lifecycle</h3>
+          <AlertLifecycleFunnel alerts={alerts} />
+        </article>
+      </div>
+
       <article className="panel">
         <h2>Active Alerts</h2>
+        {severityFilter && (
+          <div className="filter-row" style={{ marginBottom: 12 }}>
+            <span style={{ fontSize: 'var(--font-sm)', color: 'var(--muted)' }}>
+              Filtered by severity: <strong>{severityFilter}</strong>
+            </span>
+            <button className="btn btn-small" onClick={() => setSeverityFilter('')}>
+              Clear filter
+            </button>
+          </div>
+        )}
 
         {loading ? <SkeletonLoader rows={6} rowHeight={18} /> : null}
-        {!loading && activeAlerts.length === 0 ? (
+        {!loading && filteredActiveAlerts.length === 0 ? (
           <EmptyState
             icon={<span aria-hidden="true">[i]</span>}
-            message="No active alerts from backend."
-            actionLabel="Refresh Now"
-            onAction={fetchAlerts}
+            message={activeAlerts.length === 0 ? 'No active alerts from backend.' : 'No active alerts match the current severity filter.'}
+            actionLabel={activeAlerts.length === 0 ? 'Refresh Now' : ''}
+            onAction={activeAlerts.length === 0 ? fetchAlerts : undefined}
           />
         ) : null}
 
-        {!loading && activeAlerts.length > 0 ? (
+        {!loading && filteredActiveAlerts.length > 0 ? (
           <div className="table-container">
             <table className="data-table">
               <thead>
@@ -170,7 +218,7 @@ export default function AlertsPage({ transactions, rules }) {
                 </tr>
               </thead>
               <tbody>
-                {activeAlerts.map((alert) => (
+                {filteredActiveAlerts.map((alert) => (
                   <tr key={alert.id}>
                     <td data-label="Alert ID">{alert.alertId}</td>
                     <td data-label="Rule">{alert.ruleName}</td>

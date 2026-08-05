@@ -5,6 +5,9 @@ import StatusBadge from '../components/StatusBadge';
 import SkeletonLoader from '../components/SkeletonLoader';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
+import Sparkline from '../components/charts/Sparkline';
+import TransactionVolumeChart from '../components/charts/TransactionVolumeChart';
+import ActivityHeatmap from '../components/charts/ActivityHeatmap';
 
 // ─── Locale-normalised formatters (en-US everywhere on this page) ────────────
 const LOCALE = 'en-US';
@@ -85,8 +88,8 @@ export default function DashboardPage({ transactions, rules, loading, error, onR
   const [sortKey, setSortKey] = useState('transactionTime');
   const [sortDir, setSortDir] = useState('desc');
 
-  // ── Metrics + trends (prior window = older half by transactionTime) ──────
-  const { metrics, trends } = useMemo(() => {
+  // ── Metrics + trends + sparkline data ───────────────────────────────────
+  const { metrics, trends, sparklines } = useMemo(() => {
     const byTime = [...transactions].sort(
       (a, b) => new Date(a.transactionTime) - new Date(b.transactionTime)
     );
@@ -102,6 +105,23 @@ export default function DashboardPage({ transactions, rules, loading, error, onR
     const activeRules = rules.filter((r) => r.active).length;
     const totalVolume  = sumVolume(transactions);
 
+    // Bucket transactions by day → count array for sparklines
+    const countMap = new Map();
+    const volMap   = new Map();
+    for (const tx of byTime) {
+      const raw = tx.transactionTime || tx.createdAt;
+      if (!raw) continue;
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) continue;
+      const key = d.toISOString().slice(0, 10);
+      countMap.set(key, (countMap.get(key) || 0) + 1);
+      volMap.set(key, (volMap.get(key) || 0) + Number(tx.amount || 0));
+    }
+    const txSpark  = Array.from(countMap.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([, v]) => v);
+    const volSpark = Array.from(volMap.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([, v]) => v);
+    const highSev  = rules.filter((r) => r.active && r.severity === 'HIGH').length;
+    const highSpark = txSpark.length > 0 ? txSpark.map(() => highSev) : [highSev];
+
     return {
       metrics: {
         transactionsCount: transactions.length,
@@ -111,7 +131,12 @@ export default function DashboardPage({ transactions, rules, loading, error, onR
       trends: {
         transactions: trendDir(currentHalf.length, priorHalf.length),
         volume:       trendDir(currentVolume, priorVolume),
-        activeRules:  'neutral'   // rules carry no timestamp window
+        activeRules:  'neutral'
+      },
+      sparklines: {
+        transactions: txSpark,
+        volume:       volSpark,
+        highSeverity: highSpark,
       }
     };
   }, [transactions, rules]);
@@ -173,6 +198,7 @@ export default function DashboardPage({ transactions, rules, loading, error, onR
             {metrics.transactionsCount}
             <TrendChip direction={trends.transactions} />
           </strong>
+          <Sparkline data={sparklines.transactions} label="Transaction count trend" height={56} />
         </article>
         <article className="card">
           <h3>Active Rules</h3>
@@ -180,6 +206,7 @@ export default function DashboardPage({ transactions, rules, loading, error, onR
             {metrics.activeRules}
             <TrendChip direction={trends.activeRules} />
           </strong>
+          <Sparkline data={sparklines.highSeverity} color="var(--color-warn)" label="High-severity rules trend" height={56} />
         </article>
         <article className="card">
           <h3>Transaction Volume</h3>
@@ -187,6 +214,7 @@ export default function DashboardPage({ transactions, rules, loading, error, onR
             {fmtMoney(metrics.volume, 'INR')}
             <TrendChip direction={trends.volume} />
           </strong>
+          <Sparkline data={sparklines.volume} color="var(--color-success)" label="Transaction volume trend" height={56} />
         </article>
       </div>
 
@@ -201,6 +229,18 @@ export default function DashboardPage({ transactions, rules, loading, error, onR
           <strong className="risk-value">{riskHighlights.pendingTransactions}</strong>
         </article>
       </div>
+
+      {/* ── Transaction Volume Chart ── */}
+      <article className="panel">
+        <h2>Transaction Volume Over Time</h2>
+        <TransactionVolumeChart transactions={transactions} />
+      </article>
+
+      {/* ── Activity Heatmap ── */}
+      <article className="panel">
+        <h2>Transaction Activity Heatmap (Last 12 Weeks)</h2>
+        <ActivityHeatmap transactions={transactions} />
+      </article>
 
       {/* ── Recent Transactions ── */}
       <article className="panel">

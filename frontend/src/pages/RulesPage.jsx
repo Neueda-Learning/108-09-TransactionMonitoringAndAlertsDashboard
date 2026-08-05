@@ -5,6 +5,8 @@ import SkeletonLoader from '../components/SkeletonLoader';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
 import { RULE_TYPES, SEVERITIES } from '../constants';
+import SeverityDonutChart from '../components/charts/SeverityDonutChart';
+import RuleTriggerFrequencyChart from '../components/charts/RuleTriggerFrequencyChart';
 
 const defaultForm = {
   ruleName: '',
@@ -26,6 +28,7 @@ function toPayload(formState) {
 
 export default function RulesPage({
   rules,
+  alerts,
   loading,
   error,
   onRetry,
@@ -36,6 +39,8 @@ export default function RulesPage({
   const [formState, setFormState] = useState(defaultForm);
   const [editingId, setEditingId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [severityFilter, setSeverityFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   function resetForm() {
     setFormState(defaultForm);
@@ -70,6 +75,24 @@ export default function RulesPage({
       setIsSubmitting(false);
     }
   }
+
+  function handleSeveritySegmentClick(severity) {
+    setSeverityFilter((prev) => (prev === severity ? '' : severity));
+  }
+
+  // eslint-disable-next-line no-unused-vars
+  function handleRuleBarClick(ruleName) {
+    setSearchQuery((prev) => (prev === ruleName ? '' : ruleName));
+  }
+
+  // eslint-disable-next-line no-unused-vars
+  const filteredRules = rules.filter((rule) => {
+    const matchesSeverity = !severityFilter || (rule.severity || '').toUpperCase() === severityFilter;
+    const matchesSearch =
+      !searchQuery ||
+      (rule.ruleName || '').toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesSeverity && matchesSearch;
+  });
 
   return (
     <section>
@@ -170,20 +193,73 @@ export default function RulesPage({
         </form>
       </article>
 
+      <div className="card-grid">
+        <article className="card">
+          <h3>Rules by Severity</h3>
+          <p style={{ fontSize: 'var(--font-xs)', color: 'var(--muted)', margin: '0 0 8px' }}>
+            Click a segment to filter the rule list below
+            {severityFilter && (
+              <button
+                className="btn btn-small"
+                style={{ marginLeft: 8 }}
+                onClick={() => setSeverityFilter('')}
+              >
+                Clear ({severityFilter})
+              </button>
+            )}
+          </p>
+          <SeverityDonutChart items={rules} onSegmentClick={handleSeveritySegmentClick} />
+        </article>
+        <article className="card">
+          <h3>Rule Trigger Frequency</h3>
+          <p style={{ fontSize: 'var(--font-xs)', color: 'var(--muted)', margin: '0 0 8px' }}>
+            Click a bar to filter by rule name
+            {searchQuery && (
+              <button
+                className="btn btn-small"
+                style={{ marginLeft: 8 }}
+                onClick={() => setSearchQuery('')}
+              >
+                Clear ("{searchQuery}")
+              </button>
+            )}
+          </p>
+          <RuleTriggerFrequencyChart alerts={alerts || []} rules={rules} onBarClick={handleRuleBarClick} />
+        </article>
+      </div>
+
       <article className="panel">
         <h2>Rule List</h2>
 
+        {(severityFilter || searchQuery) && (
+          <div className="filter-row" style={{ marginBottom: 12 }}>
+            {severityFilter && (
+              <span style={{ fontSize: 'var(--font-sm)', color: 'var(--muted)' }}>
+                Severity: <strong>{severityFilter}</strong>
+              </span>
+            )}
+            {searchQuery && (
+              <span style={{ fontSize: 'var(--font-sm)', color: 'var(--muted)' }}>
+                Rule: <strong>{searchQuery}</strong>
+              </span>
+            )}
+            <button className="btn btn-small" onClick={() => { setSeverityFilter(''); setSearchQuery(''); }}>
+              Clear filters
+            </button>
+          </div>
+        )}
+
         {loading ? <SkeletonLoader rows={6} rowHeight={18} /> : null}
-        {!loading && rules.length === 0 ? (
+        {!loading && filteredRules.length === 0 ? (
           <EmptyState
             icon={<span aria-hidden="true">[!]</span>}
-            message="No rules found."
-            actionLabel={onRetry ? 'Refresh Rules' : ''}
-            onAction={onRetry}
+            message={rules.length === 0 ? 'No rules found.' : 'No rules match the current filters.'}
+            actionLabel={rules.length === 0 && onRetry ? 'Refresh Rules' : ''}
+            onAction={rules.length === 0 ? onRetry : undefined}
           />
         ) : null}
 
-        {!loading && rules.length > 0 ? (
+        {!loading && filteredRules.length > 0 ? (
           <div className="table-container">
             <table className="data-table">
               <thead>
@@ -199,7 +275,7 @@ export default function RulesPage({
                 </tr>
               </thead>
               <tbody>
-                {rules.map((rule) => (
+                {filteredRules.map((rule) => (
                   <tr key={rule.id}>
                     <td data-label="ID">{rule.id}</td>
                     <td data-label="Name">{rule.ruleName}</td>

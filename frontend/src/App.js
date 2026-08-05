@@ -8,11 +8,13 @@ import RulesPage from './pages/RulesPage';
 import AlertsPage from './pages/AlertsPage';
 import { transactionsApi } from './api/transactionsApi';
 import { rulesApi } from './api/rulesApi';
+import { alertsApi } from './api/alertsApi';
 import { useToast } from './components/Toast';
 
 function App() {
   const [transactions, setTransactions] = useState([]);
   const [rules, setRules] = useState([]);
+  const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { toastSuccess, toastError } = useToast();
@@ -22,13 +24,15 @@ function App() {
     setError('');
 
     try {
-      const [transactionsData, rulesData] = await Promise.all([
+      const [transactionsData, rulesData, alertsData] = await Promise.all([
         transactionsApi.getAll(),
-        rulesApi.getAll()
+        rulesApi.getAll(),
+        alertsApi.getAll().catch(() => [])
       ]);
 
       setTransactions(Array.isArray(transactionsData) ? transactionsData : []);
       setRules(Array.isArray(rulesData) ? rulesData : []);
+      setAlerts(Array.isArray(alertsData) ? alertsData : []);
     } catch (err) {
       setError(err.message || 'Failed to load dashboard data.');
     } finally {
@@ -173,6 +177,7 @@ function App() {
               element={
                 <RulesPage
                   rules={rules}
+                  alerts={alerts}
                   loading={loading}
                   error={error}
                   onRetry={loadData}
