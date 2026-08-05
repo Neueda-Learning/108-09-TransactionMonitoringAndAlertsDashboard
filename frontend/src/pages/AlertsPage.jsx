@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import StatusBadge from '../components/StatusBadge';
 import SkeletonLoader from '../components/SkeletonLoader';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { useToast } from '../components/Toast';
 import { ALERT_STATUS } from '../constants';
 import { alertsApi } from '../api/alertsApi';
@@ -13,6 +14,23 @@ import SeverityDonutChart from '../components/charts/SeverityDonutChart';
 import AlertLifecycleFunnel from '../components/charts/AlertLifecycleFunnel';
 
 const REFRESH_INTERVAL_MS = Number(process.env.REACT_APP_ALERTS_POLL_MS || 3000);
+const TAB_ACTIVE_QUEUE = 'ACTIVE_QUEUE';
+const TAB_HISTORY = 'HISTORY';
+
+const defaultFilters = {
+  status: 'ALL',
+  severity: 'ALL',
+  ruleType: 'ALL',
+  transactionRef: '',
+  createdFrom: '',
+  createdTo: ''
+};
+
+function parseDateTimeInput(value) {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
 
 function normalizeAlerts(apiAlerts, transactions, rules) {
   const rulesById = new Map(rules.map((rule) => [rule.id, rule]));
@@ -41,8 +59,12 @@ export default function AlertsPage({ transactions, rules }) {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-  const [severityFilter, setSeverityFilter] = useState('');
+  const [updatingAlertIds, setUpdatingAlertIds] = useState({});
+  const [activeTab, setActiveTab] = useState(TAB_ACTIVE_QUEUE);
+  const [filters, setFilters] = useState(defaultFilters);
+  const [expandedAlertIds, setExpandedAlertIds] = useState(() => new Set());
+  const [lastRefreshedAt, setLastRefreshedAt] = useState(null);
+  const [pendingTransition, setPendingTransition] = useState(null);
   const { toastSuccess, toastError } = useToast();
 
   const fetchAlerts = useCallback(async () => {
@@ -50,6 +72,7 @@ export default function AlertsPage({ transactions, rules }) {
       setError('');
       const backendAlerts = await alertsApi.getAll();
       setAlerts(normalizeAlerts(backendAlerts, transactions, rules));
+      setLastRefreshedAt(new Date());
     } catch (err) {
       setError(err.message || 'Failed to load alerts from backend API.');
     }
@@ -66,6 +89,7 @@ export default function AlertsPage({ transactions, rules }) {
         if (isMounted) {
           setAlerts(normalizeAlerts(backendAlerts, transactions, rules));
           setError('');
+          setLastRefreshedAt(new Date());
         }
       } catch (err) {
         if (isMounted) {
@@ -98,16 +122,120 @@ export default function AlertsPage({ transactions, rules }) {
     [alerts]
   );
 
-  const filteredActiveAlerts = useMemo(
+  const transactionReferencesByKey = useMemo(() => {
+    const refs = new Map();
+
+    (Array.isArray(transactions) ? transactions : []).forEach((transaction) => {
+      const friendlyRef = String(transaction.transactionId || transaction.id || '').trim();
+      if (!friendlyRef) return;
+
+      if (transaction.id !== undefined && transaction.id !== null) {
+        refs.set(String(transaction.id), friendlyRef);
+      }
+
+      refs.set(String(transaction.transactionId), friendlyRef);
+    });
+
+    return refs;
+  }, [transactions]);
+
+  const decoratedAlerts = useMemo(
     () =>
-      severityFilter
-        ? activeAlerts.filter((a) => (a.severity || '').toUpperCase() === severityFilter)
-        : activeAlerts,
-    [activeAlerts, severityFilter]
+      alerts.map((alert) => {
+        const mappedRefById = transactionReferencesByKey.get(String(alert.transactionId));
+        const mappedRefByExisting = transactionReferencesByKey.get(String(alert.transactionRef));
+        const transactionReference =
+          mappedRefById ||
+          mappedRefByExisting ||
+          String(alert.transactionRef || alert.transactionId || '-');
+
+        return {
+          ...alert,
+          transactionReference
+        };
+      }),
+    [alerts, transactionReferencesByKey]
   );
 
+  const statusOptions = useMemo(() => {
+    const fromAlerts = decoratedAlerts
+      .map((alert) => String(alert.status || '').toUpperCase())
+      .filter(Boolean);
+    return ['ALL', ...Array.from(new Set(fromAlerts))];
+  }, [decoratedAlerts]);
+
+  const severityOptions = useMemo(() => {
+    const fromAlerts = decoratedAlerts
+      .map((alert) => String(alert.severity || '').toUpperCase())
+      .filter(Boolean);
+    return ['ALL', ...Array.from(new Set(fromAlerts))];
+  }, [decoratedAlerts]);
+
+  const ruleTypeOptions = useMemo(() => {
+    const fromAlerts = decoratedAlerts
+      .map((alert) => String(alert.ruleType || '').toUpperCase())
+      .filter(Boolean);
+    return ['ALL', ...Array.from(new Set(fromAlerts))];
+  }, [decoratedAlerts]);
+
+  const filteredAlerts = useMemo(() => {
+    const createdFrom = parseDateTimeInput(filters.createdFrom);
+    const createdTo = parseDateTimeInput(filters.createdTo);
+    const transactionRefQuery = filters.transactionRef.trim().toLowerCase();
+
+    return decoratedAlerts.filter((alert) => {
+      const normalizedStatus = String(alert.status || '').toUpperCase();
+      const normalizedSeverity = String(alert.severity || '').toUpperCase();
+      const normalizedRuleType = String(alert.ruleType || '').toUpperCase();
+      const createdAtDate = new Date(alert.createdAt);
+      const hasCreatedAt = !Number.isNaN(createdAtDate.getTime());
+
+      const statusMatch = filters.status === 'ALL' || normalizedStatus === filters.status;
+      const severityMatch = filters.severity === 'ALL' || normalizedSeverity === filters.severity;
+      const ruleTypeMatch = filters.ruleType === 'ALL' || normalizedRuleType === filters.ruleType;
+
+      const referenceMatch =
+        !transactionRefQuery ||
+        alert.transactionReference.toLowerCase().includes(transactionRefQuery);
+
+      const createdFromMatch = !createdFrom || (hasCreatedAt && createdAtDate >= createdFrom);
+      const createdToMatch = !createdTo || (hasCreatedAt && createdAtDate <= createdTo);
+
+      return (
+        statusMatch &&
+        severityMatch &&
+        ruleTypeMatch &&
+        referenceMatch &&
+        createdFromMatch &&
+        createdToMatch
+      );
+    });
+  }, [decoratedAlerts, filters]);
+
+  const activeQueueAlerts = useMemo(
+    () =>
+      filteredAlerts.filter(
+        (alert) => ![ALERT_STATUS.CLOSED, ALERT_STATUS.DISMISSED].includes(alert.status)
+      ),
+    [filteredAlerts]
+  );
+
+  const historyAlerts = useMemo(
+    () =>
+      filteredAlerts.filter((alert) =>
+        [ALERT_STATUS.CLOSED, ALERT_STATUS.DISMISSED].includes(alert.status)
+      ),
+    [filteredAlerts]
+  );
+
+  const visibleAlerts = activeTab === TAB_ACTIVE_QUEUE ? activeQueueAlerts : historyAlerts;
+
   function handleSeveritySegmentClick(severity) {
-    setSeverityFilter((prev) => (prev === severity ? '' : severity));
+    setFilters((prev) => ({
+      ...prev,
+      severity: prev.severity === severity ? 'ALL' : severity
+    }));
+    setActiveTab(TAB_ACTIVE_QUEUE);
   }
 
   async function transitionAlert(alert, targetStatus) {
@@ -115,7 +243,10 @@ export default function AlertsPage({ transactions, rules }) {
       return;
     }
 
-    setIsUpdatingStatus(true);
+    setUpdatingAlertIds((previous) => ({
+      ...previous,
+      [alert.id]: true
+    }));
 
     try {
       await alertsApi.updateStatus(alert.id, targetStatus);
@@ -126,8 +257,68 @@ export default function AlertsPage({ transactions, rules }) {
       setError(failureMessage);
       toastError(failureMessage, { details: String(err) });
     } finally {
-      setIsUpdatingStatus(false);
+      setUpdatingAlertIds((previous) => {
+        const next = { ...previous };
+        delete next[alert.id];
+        return next;
+      });
     }
+  }
+
+  function handleFilterChange(field, value) {
+    setFilters((previous) => ({
+      ...previous,
+      [field]: value
+    }));
+  }
+
+  function clearFilters() {
+    setFilters(defaultFilters);
+  }
+
+  function toggleAlertExpansion(alertId) {
+    setExpandedAlertIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(alertId)) {
+        next.delete(alertId);
+      } else {
+        next.add(alertId);
+      }
+      return next;
+    });
+  }
+
+  function requestTransition(alert, targetStatus) {
+    if (![ALERT_STATUS.CLOSED, ALERT_STATUS.DISMISSED].includes(targetStatus)) {
+      transitionAlert(alert, targetStatus);
+      return;
+    }
+
+    setPendingTransition({ alert, targetStatus });
+  }
+
+  async function confirmPendingTransition() {
+    if (!pendingTransition) return;
+    const transition = pendingTransition;
+    setPendingTransition(null);
+    await transitionAlert(transition.alert, transition.targetStatus);
+  }
+
+  function getAlertTimeline(alert) {
+    const explicitHistory = Array.isArray(alert.history) ? alert.history : [];
+    if (explicitHistory.length > 0) {
+      return [...explicitHistory].sort(
+        (left, right) => new Date(right.changedAt || right.updatedAt || 0) - new Date(left.changedAt || left.updatedAt || 0)
+      );
+    }
+
+    return [
+      {
+        status: alert.status,
+        changedAt: alert.updatedAt || alert.createdAt,
+        note: alert.reason || 'No additional history recorded.'
+      }
+    ];
   }
 
   return (
@@ -136,11 +327,19 @@ export default function AlertsPage({ transactions, rules }) {
         title="Alerts"
         subtitle={`Realtime backend alerts via /api/alerts (auto-refresh every ${REFRESH_INTERVAL_MS / 1000}s)`}
         action={
-          <button className="btn" onClick={fetchAlerts} disabled={loading || isUpdatingStatus}>
+          <button className="btn" onClick={fetchAlerts} disabled={loading}>
             Refresh Now
           </button>
         }
       />
+
+      <div className="alerts-refresh-meta" role="status" aria-live="polite">
+        <span className="auto-refresh-indicator">
+          <span className="auto-refresh-dot" aria-hidden="true" />
+          Auto-refresh on ({REFRESH_INTERVAL_MS / 1000}s)
+        </span>
+        <span>Last refreshed at {lastRefreshedAt ? formatDateTime(lastRefreshedAt) : '-'}</span>
+      </div>
 
       {error ? (
         <ErrorState message="Unable to load alerts." error={error} onRetry={fetchAlerts} />
@@ -162,13 +361,13 @@ export default function AlertsPage({ transactions, rules }) {
           <h3>Alerts by Severity</h3>
           <p style={{ fontSize: 'var(--font-xs)', color: 'var(--muted)', margin: '0 0 8px' }}>
             Click a segment to filter active alerts below
-            {severityFilter && (
+            {filters.severity !== 'ALL' && (
               <button
                 className="btn btn-small"
                 style={{ marginLeft: 8 }}
-                onClick={() => setSeverityFilter('')}
+                onClick={() => handleFilterChange('severity', 'ALL')}
               >
-                Clear ({severityFilter})
+                Clear ({filters.severity})
               </button>
             )}
           </p>
@@ -181,29 +380,101 @@ export default function AlertsPage({ transactions, rules }) {
       </div>
 
       <article className="panel">
-        <h2>Active Alerts</h2>
-        {severityFilter && (
-          <div className="filter-row" style={{ marginBottom: 12 }}>
-            <span style={{ fontSize: 'var(--font-sm)', color: 'var(--muted)' }}>
-              Filtered by severity: <strong>{severityFilter}</strong>
-            </span>
-            <button className="btn btn-small" onClick={() => setSeverityFilter('')}>
-              Clear filter
-            </button>
-          </div>
-        )}
+        <h2>Alert Queue</h2>
+
+        <div className="filter-row alerts-filter-row">
+          <select value={filters.status} onChange={(event) => handleFilterChange('status', event.target.value)}>
+            {statusOptions.map((status) => (
+              <option key={status} value={status}>
+                {status === 'ALL' ? 'All statuses' : status}
+              </option>
+            ))}
+          </select>
+
+          <select value={filters.severity} onChange={(event) => handleFilterChange('severity', event.target.value)}>
+            {severityOptions.map((severity) => (
+              <option key={severity} value={severity}>
+                {severity === 'ALL' ? 'All severities' : severity}
+              </option>
+            ))}
+          </select>
+
+          <select value={filters.ruleType} onChange={(event) => handleFilterChange('ruleType', event.target.value)}>
+            {ruleTypeOptions.map((ruleType) => (
+              <option key={ruleType} value={ruleType}>
+                {ruleType === 'ALL' ? 'All rule types' : ruleType}
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="text"
+            placeholder="Transaction reference"
+            value={filters.transactionRef}
+            onChange={(event) => handleFilterChange('transactionRef', event.target.value)}
+          />
+
+          <input
+            type="datetime-local"
+            value={filters.createdFrom}
+            onChange={(event) => handleFilterChange('createdFrom', event.target.value)}
+            title="Created from"
+          />
+
+          <input
+            type="datetime-local"
+            value={filters.createdTo}
+            onChange={(event) => handleFilterChange('createdTo', event.target.value)}
+            title="Created to"
+          />
+
+          <button className="btn btn-secondary" type="button" onClick={clearFilters}>
+            Clear Filters
+          </button>
+        </div>
+
+        <div className="alerts-tabs" role="tablist" aria-label="Alert queue views">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === TAB_ACTIVE_QUEUE}
+            className={`status-chip ${activeTab === TAB_ACTIVE_QUEUE ? 'status-chip-active' : ''}`}
+            onClick={() => setActiveTab(TAB_ACTIVE_QUEUE)}
+          >
+            Active queue <span className="tab-count-badge">{activeQueueAlerts.length}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === TAB_HISTORY}
+            className={`status-chip ${activeTab === TAB_HISTORY ? 'status-chip-active' : ''}`}
+            onClick={() => setActiveTab(TAB_HISTORY)}
+          >
+            Closed/Dismissed history <span className="tab-count-badge">{historyAlerts.length}</span>
+          </button>
+        </div>
+
+        <div className="list-toolbar">
+          <p className="results-counter">
+            {visibleAlerts.length.toLocaleString()} alerts in {activeTab === TAB_ACTIVE_QUEUE ? 'active queue' : 'history'}
+          </p>
+        </div>
 
         {loading ? <SkeletonLoader rows={6} rowHeight={18} /> : null}
-        {!loading && filteredActiveAlerts.length === 0 ? (
+        {!loading && visibleAlerts.length === 0 ? (
           <EmptyState
             icon={<span aria-hidden="true">[i]</span>}
-            message={activeAlerts.length === 0 ? 'No active alerts from backend.' : 'No active alerts match the current severity filter.'}
-            actionLabel={activeAlerts.length === 0 ? 'Refresh Now' : ''}
-            onAction={activeAlerts.length === 0 ? fetchAlerts : undefined}
+            message={
+              activeTab === TAB_ACTIVE_QUEUE
+                ? 'No active alerts match current filters.'
+                : 'No closed or dismissed alerts match current filters.'
+            }
+            actionLabel="Clear Filters"
+            onAction={clearFilters}
           />
         ) : null}
 
-        {!loading && filteredActiveAlerts.length > 0 ? (
+        {!loading && visibleAlerts.length > 0 ? (
           <div className="table-container">
             <table className="data-table">
               <thead>
@@ -214,113 +485,140 @@ export default function AlertsPage({ transactions, rules }) {
                   <th>Status</th>
                   <th>Transaction</th>
                   <th>Created</th>
-                  <th>Actions</th>
+                  {activeTab === TAB_ACTIVE_QUEUE ? <th>Actions</th> : null}
                 </tr>
               </thead>
               <tbody>
-                {filteredActiveAlerts.map((alert) => (
-                  <tr key={alert.id}>
-                    <td data-label="Alert ID">{alert.alertId}</td>
-                    <td data-label="Rule">{alert.ruleName}</td>
-                    <td data-label="Severity">
-                      <StatusBadge value={alert.severity} />
-                    </td>
-                    <td data-label="Status">
-                      <StatusBadge value={alert.status} />
-                    </td>
-                    <td data-label="Transaction">{alert.transactionRef}</td>
-                    <td data-label="Created">{formatDateTime(alert.createdAt)}</td>
-                    <td data-label="Actions">
-                      <div className="table-actions">
-                        <button
-                          className="btn btn-small"
-                          disabled={
-                            isUpdatingStatus ||
-                            !canTransitionAlert(alert.status, ALERT_STATUS.ACKNOWLEDGED)
-                          }
-                          onClick={() => transitionAlert(alert, ALERT_STATUS.ACKNOWLEDGED)}
-                        >
-                          Acknowledge
-                        </button>
-                        <button
-                          className="btn btn-small"
-                          disabled={
-                            isUpdatingStatus ||
-                            !canTransitionAlert(alert.status, ALERT_STATUS.INVESTIGATING)
-                          }
-                          onClick={() => transitionAlert(alert, ALERT_STATUS.INVESTIGATING)}
-                        >
-                          Investigate
-                        </button>
-                        <button
-                          className="btn btn-small"
-                          disabled={
-                            isUpdatingStatus ||
-                            !canTransitionAlert(alert.status, ALERT_STATUS.CLOSED)
-                          }
-                          onClick={() => transitionAlert(alert, ALERT_STATUS.CLOSED)}
-                        >
-                          Close
-                        </button>
-                        <button
-                          className="btn btn-small btn-danger"
-                          disabled={
-                            isUpdatingStatus ||
-                            !canTransitionAlert(alert.status, ALERT_STATUS.DISMISSED)
-                          }
-                          onClick={() => transitionAlert(alert, ALERT_STATUS.DISMISSED)}
-                        >
-                          Dismiss
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {visibleAlerts.map((alert) => {
+                  const isExpanded = expandedAlertIds.has(alert.id);
+                  const isUpdatingRow = Boolean(updatingAlertIds[alert.id]);
+                  const timeline = getAlertTimeline(alert);
+
+                  return (
+                    <Fragment key={alert.id}>
+                      <tr key={alert.id}>
+                        <td data-label="Alert ID">
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-small expand-row-btn"
+                            onClick={() => toggleAlertExpansion(alert.id)}
+                            aria-expanded={isExpanded}
+                          >
+                            {isExpanded ? 'Hide' : 'Show'} {alert.alertId}
+                          </button>
+                        </td>
+                        <td data-label="Rule">{alert.ruleName}</td>
+                        <td data-label="Severity">
+                          <StatusBadge value={alert.severity} />
+                        </td>
+                        <td data-label="Status">
+                          <StatusBadge value={alert.status} />
+                        </td>
+                        <td data-label="Transaction">{alert.transactionReference}</td>
+                        <td data-label="Created">{formatDateTime(alert.createdAt)}</td>
+                        {activeTab === TAB_ACTIVE_QUEUE ? (
+                          <td data-label="Actions">
+                            <div className="table-actions">
+                              <button
+                                className="btn btn-small"
+                                disabled={
+                                  isUpdatingRow ||
+                                  !canTransitionAlert(alert.status, ALERT_STATUS.ACKNOWLEDGED)
+                                }
+                                onClick={() => requestTransition(alert, ALERT_STATUS.ACKNOWLEDGED)}
+                                aria-busy={isUpdatingRow}
+                              >
+                                {isUpdatingRow ? 'Updating...' : 'Acknowledge'}
+                              </button>
+                              <button
+                                className="btn btn-small"
+                                disabled={
+                                  isUpdatingRow ||
+                                  !canTransitionAlert(alert.status, ALERT_STATUS.INVESTIGATING)
+                                }
+                                onClick={() => requestTransition(alert, ALERT_STATUS.INVESTIGATING)}
+                                aria-busy={isUpdatingRow}
+                              >
+                                {isUpdatingRow ? 'Updating...' : 'Investigate'}
+                              </button>
+                              <button
+                                className="btn btn-small"
+                                disabled={
+                                  isUpdatingRow ||
+                                  !canTransitionAlert(alert.status, ALERT_STATUS.CLOSED)
+                                }
+                                onClick={() => requestTransition(alert, ALERT_STATUS.CLOSED)}
+                                aria-busy={isUpdatingRow}
+                              >
+                                {isUpdatingRow ? <span className="inline-spinner" aria-hidden="true" /> : null}
+                                Close
+                              </button>
+                              <button
+                                className="btn btn-small btn-danger"
+                                disabled={
+                                  isUpdatingRow ||
+                                  !canTransitionAlert(alert.status, ALERT_STATUS.DISMISSED)
+                                }
+                                onClick={() => requestTransition(alert, ALERT_STATUS.DISMISSED)}
+                                aria-busy={isUpdatingRow}
+                              >
+                                {isUpdatingRow ? <span className="inline-spinner" aria-hidden="true" /> : null}
+                                Dismiss
+                              </button>
+                            </div>
+                          </td>
+                        ) : null}
+                      </tr>
+
+                      {isExpanded ? (
+                        <tr key={`${alert.id}-details`} className="alert-details-row">
+                          <td
+                            data-label="Details"
+                            colSpan={activeTab === TAB_ACTIVE_QUEUE ? 7 : 6}
+                          >
+                            <div className="alert-details-content">
+                              <p className="alert-details-reason">
+                                <strong>Reason:</strong> {alert.reason || 'No reason provided.'}
+                              </p>
+                              <div>
+                                <strong>Timeline:</strong>
+                                <ul className="alert-timeline">
+                                  {timeline.map((event, index) => (
+                                    <li key={`${alert.id}-timeline-${index}`}>
+                                      <StatusBadge value={event.status || alert.status} />
+                                      <span>{formatDateTime(event.changedAt || event.updatedAt)}</span>
+                                      <span>{event.note || event.reason || 'Status updated.'}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         ) : null}
       </article>
 
-      <article className="panel">
-        <h2>Alert History</h2>
-        {loading ? <SkeletonLoader rows={4} rowHeight={18} /> : null}
-        {!loading && alerts.length === 0 ? (
-          <EmptyState
-            icon={<span aria-hidden="true">[i]</span>}
-            message="No history yet."
-            actionLabel="Refresh Now"
-            onAction={fetchAlerts}
-          />
-        ) : null}
-
-        {!loading && alerts.length > 0 ? (
-          <div className="table-container">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Alert ID</th>
-                  <th>Status</th>
-                  <th>Updated At</th>
-                  <th>Reason</th>
-                </tr>
-              </thead>
-              <tbody>
-                {alerts.map((alert) => (
-                  <tr key={`history-${alert.id}`}>
-                    <td data-label="Alert ID">{alert.alertId}</td>
-                    <td data-label="Status">
-                      <StatusBadge value={alert.status} />
-                    </td>
-                    <td data-label="Updated At">{formatDateTime(alert.updatedAt)}</td>
-                    <td data-label="Reason">{alert.reason}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : null}
-      </article>
+      <ConfirmDialog
+        isOpen={Boolean(pendingTransition)}
+        title={pendingTransition?.targetStatus === ALERT_STATUS.DISMISSED ? 'Dismiss alert' : 'Close alert'}
+        message={
+          pendingTransition
+            ? `Move alert ${pendingTransition.alert.alertId} to ${pendingTransition.targetStatus}?`
+            : ''
+        }
+        confirmLabel={pendingTransition?.targetStatus === ALERT_STATUS.DISMISSED ? 'Dismiss' : 'Close'}
+        cancelLabel="Cancel"
+        onConfirm={confirmPendingTransition}
+        onCancel={() => setPendingTransition(null)}
+        tone={pendingTransition?.targetStatus === ALERT_STATUS.DISMISSED ? 'danger' : 'default'}
+      />
     </section>
   );
 }
