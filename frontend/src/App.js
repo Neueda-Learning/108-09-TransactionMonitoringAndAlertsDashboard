@@ -102,10 +102,23 @@ function App() {
     }
   }
 
+  const globalStatusMessage = '';
+
   return (
     <BrowserRouter>
       <div className="app-shell">
         <NavBar />
+
+        <div
+          className={`status-strip-slot${globalStatusMessage ? ' is-visible' : ''}`}
+          aria-live="polite"
+        >
+          {globalStatusMessage ? (
+            <div className="container status-strip status-strip-error" role="alert">
+              {globalStatusMessage}
+            </div>
+          ) : null}
+        </div>
 
         <main className="container main-content">
           <Routes>
