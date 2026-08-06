@@ -3,6 +3,7 @@ package com.neueda.service;
 import com.neueda.dto.AlertRequest;
 import com.neueda.entity.Rule;
 import com.neueda.entity.Transaction;
+import com.neueda.repository.AlertRepository;
 import com.neueda.repository.RuleRepository;
 import com.neueda.repository.TransactionRepository;
 import com.neueda.ruleengine.RuleEngine;
@@ -23,15 +24,18 @@ public class TransactionService {
     private final TransactionRepository repository;
     private final RuleRepository ruleRepository;
     private final AlertService alertService;
+    private final AlertRepository alertRepository;
     private final SdnScreeningService sdnScreeningService;
 
     public TransactionService(TransactionRepository repository,
                               RuleRepository ruleRepository,
                               AlertService alertService,
+                              AlertRepository alertRepository,
                               SdnScreeningService sdnScreeningService) {
         this.repository = repository;
         this.ruleRepository = ruleRepository;
         this.alertService = alertService;
+        this.alertRepository = alertRepository;
         this.sdnScreeningService = sdnScreeningService;
     }
 
@@ -134,6 +138,9 @@ public class TransactionService {
 
         Transaction transaction = repository.findByTransactionId(transactionId)
                 .orElseThrow(() -> new RuntimeException("Transaction not found"));
+
+        // Delete all alerts linked to this transaction first to avoid FK constraint violation
+        alertRepository.deleteAll(alertRepository.findByTransactionId(transaction.getId()));
 
         repository.delete(transaction);
     }

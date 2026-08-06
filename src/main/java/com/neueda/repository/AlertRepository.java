@@ -14,4 +14,6 @@ public interface AlertRepository extends JpaRepository<Alert, Long> {
     List<Alert> findBySeverity(String severity);
 
     List<Alert> findByTransactionId(Long transactionId);
+
+    List<Alert> findByRuleId(Long ruleId);
 }

@@ -2,14 +2,23 @@ import { API_BASE_URL } from '../constants';
 
 async function parseResponse(response) {
   const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
 
   if (!response.ok) {
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch (_) {}
     const message = data?.message || data?.error || `Request failed with status ${response.status}`;
     throw new Error(message);
   }
 
-  return data;
+  if (!text || text.trim() === '') {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch (_) {
+    return text;
+  }
 }
 
 export async function apiRequest(path, options = {}) {
