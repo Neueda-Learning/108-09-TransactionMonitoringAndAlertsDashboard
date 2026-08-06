@@ -63,7 +63,7 @@ function normalizeAlerts(apiAlerts, transactions, rules) {
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 
-export default function AlertsPage({ transactions, rules, onNotify }) {
+export default function AlertsPage({ transactions, rules, onNotify, onSilenceHighAlertAttention }) {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -152,6 +152,10 @@ export default function AlertsPage({ transactions, rules, onNotify }) {
 
   async function transitionAlert(alert, targetStatus) {
     if (!canTransitionAlert(alert.status, targetStatus)) return;
+
+    // Stop navbar attention as soon as user starts handling this HIGH alert.
+    onSilenceHighAlertAttention?.(alert);
+
     setIsUpdatingStatus(true);
     try {
       await alertsApi.updateStatus(alert.id, targetStatus);

@@ -38,6 +38,30 @@ function AppShell() {
   const notificationTimersRef = useRef(new Map());
   const knownAlertIdsRef = useRef(new Set());
   const alertsInitializedRef = useRef(false);
+  const silencedHighAlertIdsRef = useRef(new Set());
+  const latestAlertsRef = useRef([]);
+
+  const recomputeAlertsAttention = useCallback((alertsSnapshot) => {
+    const activeHighAlertIds = alertsSnapshot
+      .filter((alert) => isActiveAlert(alert) && isHighSeverityAlert(alert))
+      .map((alert) => String(alert.id ?? alert.alertId ?? ''))
+      .filter(Boolean);
+
+    const activeHighAlertIdSet = new Set(activeHighAlertIds);
+
+    // Keep silenced ids scoped to currently active HIGH alerts.
+    silencedHighAlertIdsRef.current.forEach((alertId) => {
+      if (!activeHighAlertIdSet.has(alertId)) {
+        silencedHighAlertIdsRef.current.delete(alertId);
+      }
+    });
+
+    const hasUnsilencedHighAlert = activeHighAlertIds.some(
+      (alertId) => !silencedHighAlertIdsRef.current.has(alertId)
+    );
+
+    setAlertsNeedAttention(hasUnsilencedHighAlert);
+  }, []);
 
   const dismissNotification = useCallback((notificationId) => {
     const timerId = notificationTimersRef.current.get(notificationId);
@@ -79,7 +103,8 @@ function AppShell() {
     try {
       const backendAlerts = await alertsApi.getAll();
       const safeAlerts = Array.isArray(backendAlerts) ? backendAlerts : [];
-      setAlertsNeedAttention(safeAlerts.some((alert) => isActiveAlert(alert) && isHighSeverityAlert(alert)));
+      latestAlertsRef.current = safeAlerts;
+      recomputeAlertsAttention(safeAlerts);
       const previousIds = knownAlertIdsRef.current;
       const nextIds = new Set(
         safeAlerts
@@ -108,7 +133,18 @@ function AppShell() {
     } catch (_) {
       // Ignore polling errors here so existing page-level error handling remains unchanged.
     }
-  }, [showNotification]);
+  }, [recomputeAlertsAttention, showNotification]);
+
+  const handleSilenceHighAlertAttention = useCallback((alert) => {
+    const alertId = String(alert?.id ?? alert?.alertId ?? '');
+
+    if (!alertId || !isHighSeverityAlert(alert)) {
+      return;
+    }
+
+    silencedHighAlertIdsRef.current.add(alertId);
+    recomputeAlertsAttention(latestAlertsRef.current);
+  }, [recomputeAlertsAttention]);
 
   useEffect(() => {
     pollAlerts();
@@ -285,6 +321,7 @@ function AppShell() {
                 transactions={transactions}
                 rules={rules}
                 onNotify={showNotification}
+                onSilenceHighAlertAttention={handleSilenceHighAlertAttention}
               />
             }
           />
