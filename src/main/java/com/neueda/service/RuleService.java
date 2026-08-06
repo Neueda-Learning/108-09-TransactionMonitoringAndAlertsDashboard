@@ -3,8 +3,8 @@ package com.neueda.service;
 import com.neueda.dto.RuleRequest;
 import com.neueda.dto.RuleResponse;
 import com.neueda.entity.Rule;
+import com.neueda.repository.AlertRepository;
 import com.neueda.repository.RuleRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -13,8 +13,13 @@ import java.util.List;
 @Service
 public class RuleService {
 
-    @Autowired
-    private RuleRepository ruleRepository;
+    private final RuleRepository ruleRepository;
+    private final AlertRepository alertRepository;
+
+    public RuleService(final RuleRepository ruleRepository, final AlertRepository alertRepository) {
+        this.ruleRepository = ruleRepository;
+        this.alertRepository = alertRepository;
+    }
 
     // Create Rule
     public RuleResponse createRule(RuleRequest request) {
@@ -82,6 +87,8 @@ public class RuleService {
 
         Rule rule = ruleRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Rule not found"));
+
+        alertRepository.deleteAll(alertRepository.findByRuleId(rule.getId()));
 
         ruleRepository.delete(rule);
 
