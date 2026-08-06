@@ -46,7 +46,7 @@ class TransactionServiceSdnAlertIntegrationTest {
         newPayeeRule.setThreshold(5000d);
         newPayeeRule.setSeverity("MEDIUM");
         newPayeeRule.setActive(true);
-        ruleRepository.save(newPayeeRule);
+        Rule savedNewPayeeRule = ruleRepository.save(newPayeeRule);
 
         Transaction transaction = buildTransaction("TX-SDN-BANK-MELLI-1", "PAY-001", "Bank Melli Iran", 20000d);
         Transaction saved = transactionService.addTransaction(transaction);
@@ -54,8 +54,16 @@ class TransactionServiceSdnAlertIntegrationTest {
         List<Alert> alerts = alertRepository.findByTransactionId(saved.getId());
 
         Assertions.assertEquals(2, alerts.size(), "Expected NEW_PAYEE and built-in SDN alerts");
-        Assertions.assertTrue(alerts.stream().anyMatch(alert -> alert.getRuleId().equals(-1L) && "HIGH".equals(alert.getSeverity())));
-        Assertions.assertTrue(alerts.stream().anyMatch(alert -> "MEDIUM".equals(alert.getSeverity())));
+        Assertions.assertTrue(
+                alerts.stream().anyMatch(alert -> savedNewPayeeRule.getId().equals(alert.getRuleId())
+                        && "MEDIUM".equals(alert.getSeverity())),
+                "Expected NEW_PAYEE rule alert"
+        );
+        Assertions.assertTrue(
+                alerts.stream().anyMatch(alert -> !savedNewPayeeRule.getId().equals(alert.getRuleId())
+                        && "HIGH".equals(alert.getSeverity())),
+                "Expected SDN alert with HIGH severity"
+        );
     }
 
     @Test
