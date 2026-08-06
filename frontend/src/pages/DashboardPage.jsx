@@ -44,16 +44,12 @@ export default function DashboardPage({ transactions, rules, loading, error }) {
     const activeRules = rules.filter((rule) => rule.active).length;
     const volume = transactions.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
     const completed = transactions.filter((tx) => tx.status === 'COMPLETED').length;
-    const pending = transactions.filter((tx) => tx.status === 'PENDING').length;
-    const failed = transactions.filter((tx) => tx.status === 'FAILED').length;
 
     return {
       transactionsCount: transactions.length,
       activeRules,
       volume,
-      completed,
-      pending,
-      failed
+      completed
     };
   }, [transactions, rules]);
 
@@ -134,18 +130,6 @@ export default function DashboardPage({ transactions, rules, loading, error }) {
               ? `${((metrics.completed / metrics.transactionsCount) * 100).toFixed(0)}% success rate`
               : '—'}
           </div>
-        </article>
-        <article className="card stat-card-warning">
-          <div className="card-icon" style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}>⏳</div>
-          <h3>Pending</h3>
-          <strong>{metrics.pending}</strong>
-          <div className="card-trend" style={{ color: '#f59e0b' }}>Awaiting processing</div>
-        </article>
-        <article className="card stat-card-danger">
-          <div className="card-icon" style={{ background: 'rgba(244,63,94,0.15)', color: '#f43f5e' }}>✗</div>
-          <h3>Failed</h3>
-          <strong>{metrics.failed}</strong>
-          <div className="card-trend" style={{ color: '#f43f5e' }}>Requires attention</div>
         </article>
         <article className="card stat-card-primary">
           <div className="card-icon" style={{ background: 'rgba(0,212,255,0.12)', color: '#00d4ff' }}>₹</div>
