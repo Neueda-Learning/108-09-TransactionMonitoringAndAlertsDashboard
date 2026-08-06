@@ -186,6 +186,19 @@ docker run --rm -p 8080:8080 `
 docker compose up --build
 ```
 
+Docker database bootstrap behavior in this project:
+
+- MySQL user/database are created automatically by `docker-compose.yml` (`MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`).
+- Application tables are created automatically from `src/main/resources/schema.sql` when Docker backend starts.
+- Docker backend sets `SPRING_JPA_HIBERNATE_DDL_AUTO=none` and `SPRING_SQL_INIT_MODE=always`.
+
+If you changed DB credentials and want a clean re-init:
+
+```powershell
+docker compose down -v
+docker compose up --build
+```
+
 ### GitHub Actions workflow
 
 - Workflow file: `.github/workflows/backend-ci-cd.yml`

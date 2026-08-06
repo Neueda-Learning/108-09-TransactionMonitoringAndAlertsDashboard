@@ -32,6 +32,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/transaction_monitoring?useSSL=false&serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: appuser
       SPRING_DATASOURCE_PASSWORD: apppassword
+      SPRING_JPA_HIBERNATE_DDL_AUTO: none
+      SPRING_SQL_INIT_MODE: always
       SDN_API_ENABLED: "false"
       SDN_LOCAL_LIST_ENABLED: "true"
     ports:
