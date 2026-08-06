@@ -8,16 +8,36 @@ import RulesPage from './pages/RulesPage';
 import AlertsPage from './pages/AlertsPage';
 import { transactionsApi } from './api/transactionsApi';
 import { rulesApi } from './api/rulesApi';
+import { alertsApi } from './api/alertsApi';
 
 const NOTIFICATION_TIMEOUT_MS = 3200;
+const ALERTS_POLL_INTERVAL_MS = Number(process.env.REACT_APP_ALERTS_POLL_MS || 3000);
+const RESOLVED_ALERT_STATUSES = new Set(['CLOSED', 'DISMISSED']);
 
-function App() {
+function isActiveAlert(alert) {
+  return !RESOLVED_ALERT_STATUSES.has(String(alert?.status || '').toUpperCase());
+}
+
+function isHighSeverityAlert(alert) {
+  return String(alert?.severity || '').toUpperCase() === 'HIGH';
+}
+
+function buildTriggeredAlertMessage(alert) {
+  const alertLabel = alert.alertId || alert.id || 'Unknown';
+  const severity = alert.severity ? ` (${String(alert.severity).toUpperCase()})` : '';
+  return `Alert ${alertLabel} triggered${severity}.`;
+}
+
+function AppShell() {
   const [transactions, setTransactions] = useState([]);
   const [rules, setRules] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notifications, setNotifications] = useState([]);
+  const [alertsNeedAttention, setAlertsNeedAttention] = useState(false);
   const notificationTimersRef = useRef(new Map());
+  const knownAlertIdsRef = useRef(new Set());
+  const alertsInitializedRef = useRef(false);
 
   const dismissNotification = useCallback((notificationId) => {
     const timerId = notificationTimersRef.current.get(notificationId);
@@ -54,6 +74,50 @@ function App() {
       timers.clear();
     };
   }, []);
+
+  const pollAlerts = useCallback(async () => {
+    try {
+      const backendAlerts = await alertsApi.getAll();
+      const safeAlerts = Array.isArray(backendAlerts) ? backendAlerts : [];
+      setAlertsNeedAttention(safeAlerts.some((alert) => isActiveAlert(alert) && isHighSeverityAlert(alert)));
+      const previousIds = knownAlertIdsRef.current;
+      const nextIds = new Set(
+        safeAlerts
+          .map((alert) => String(alert.id ?? alert.alertId ?? ''))
+          .filter(Boolean)
+      );
+
+      if (!alertsInitializedRef.current) {
+        knownAlertIdsRef.current = nextIds;
+        alertsInitializedRef.current = true;
+        return;
+      }
+
+      const newAlerts = safeAlerts.filter((alert) => {
+        const alertKey = String(alert.id ?? alert.alertId ?? '');
+        return alertKey && !previousIds.has(alertKey);
+      });
+
+      if (newAlerts.length > 0) {
+        newAlerts.forEach((alert) => {
+          showNotification(buildTriggeredAlertMessage(alert), 'error');
+        });
+      }
+
+      knownAlertIdsRef.current = nextIds;
+    } catch (_) {
+      // Ignore polling errors here so existing page-level error handling remains unchanged.
+    }
+  }, [showNotification]);
+
+  useEffect(() => {
+    pollAlerts();
+    const intervalId = setInterval(pollAlerts, ALERTS_POLL_INTERVAL_MS);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [pollAlerts]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -149,86 +213,92 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
-      <div className="app-shell">
-        <NavBar />
+    <div className="app-shell">
+      <NavBar alertsNeedAttention={alertsNeedAttention} />
 
-        <div className="notification-stack" aria-live="polite" aria-atomic="true">
-          {notifications.map((notification) => (
-            <div key={notification.id} className={`notification notification-${notification.variant}`} role="status">
-              <div className="notification-body">
-                <span className="notification-icon" aria-hidden="true">
-                  {notification.variant === 'success' ? '✓' : notification.variant === 'error' ? '!' : 'i'}
-                </span>
-                <span className="notification-message">{notification.message}</span>
-              </div>
-              <button
-                type="button"
-                className="notification-close"
-                aria-label="Dismiss notification"
-                onClick={() => dismissNotification(notification.id)}
-              >
-                ×
-              </button>
+      <div className="notification-stack" aria-live="polite" aria-atomic="true">
+        {notifications.map((notification) => (
+          <div key={notification.id} className={`notification notification-${notification.variant}`} role="status">
+            <div className="notification-body">
+              <span className="notification-icon" aria-hidden="true">
+                {notification.variant === 'success' ? '✓' : notification.variant === 'error' ? '!' : 'i'}
+              </span>
+              <span className="notification-message">{notification.message}</span>
             </div>
-          ))}
-        </div>
-
-        <main className="container main-content">
-          <Routes>
-            <Route
-              path="/"
-              element={
-                <DashboardPage
-                  transactions={transactions}
-                  rules={rules}
-                  loading={loading}
-                  error={error}
-                />
-              }
-            />
-            <Route
-              path="/transactions"
-              element={
-                <TransactionsPage
-                  transactions={transactions}
-                  loading={loading}
-                  error={error}
-                  onCreate={handleCreateTransaction}
-                  onUpdate={handleUpdateTransaction}
-                  onDelete={handleDeleteTransaction}
-                  onNotify={showNotification}
-                />
-              }
-            />
-            <Route
-              path="/rules"
-              element={
-                <RulesPage
-                  rules={rules}
-                  loading={loading}
-                  error={error}
-                  onCreate={handleCreateRule}
-                  onUpdate={handleUpdateRule}
-                  onDelete={handleDeleteRule}
-                  onNotify={showNotification}
-                />
-              }
-            />
-            <Route
-              path="/alerts"
-              element={
-                <AlertsPage
-                  transactions={transactions}
-                  rules={rules}
-                  onNotify={showNotification}
-                />
-              }
-            />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </main>
+            <button
+              type="button"
+              className="notification-close"
+              aria-label="Dismiss notification"
+              onClick={() => dismissNotification(notification.id)}
+            >
+              ×
+            </button>
+          </div>
+        ))}
       </div>
+
+      <main className="container main-content">
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <DashboardPage
+                transactions={transactions}
+                rules={rules}
+                loading={loading}
+                error={error}
+              />
+            }
+          />
+          <Route
+            path="/transactions"
+            element={
+              <TransactionsPage
+                transactions={transactions}
+                loading={loading}
+                error={error}
+                onCreate={handleCreateTransaction}
+                onUpdate={handleUpdateTransaction}
+                onDelete={handleDeleteTransaction}
+                onNotify={showNotification}
+              />
+            }
+          />
+          <Route
+            path="/rules"
+            element={
+              <RulesPage
+                rules={rules}
+                loading={loading}
+                error={error}
+                onCreate={handleCreateRule}
+                onUpdate={handleUpdateRule}
+                onDelete={handleDeleteRule}
+                onNotify={showNotification}
+              />
+            }
+          />
+          <Route
+            path="/alerts"
+            element={
+              <AlertsPage
+                transactions={transactions}
+                rules={rules}
+                onNotify={showNotification}
+              />
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AppShell />
     </BrowserRouter>
   );
 }

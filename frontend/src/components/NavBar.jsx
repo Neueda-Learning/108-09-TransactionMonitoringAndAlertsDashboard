@@ -7,7 +7,7 @@ const links = [
   { to: '/rules', label: 'Rules', icon: '⚙' }
 ];
 
-export default function NavBar() {
+export default function NavBar({ alertsNeedAttention = false }) {
   return (
     <header className="topbar">
       <div className="topbar-inner container">
@@ -21,7 +21,13 @@ export default function NavBar() {
               key={link.to}
               to={link.to}
               className={({ isActive }) =>
-                isActive ? 'nav-link nav-link-active' : 'nav-link'
+                [
+                  'nav-link',
+                  isActive ? 'nav-link-active' : '',
+                  link.to === '/alerts' && alertsNeedAttention ? 'nav-link-alert-attention' : ''
+                ]
+                  .filter(Boolean)
+                  .join(' ')
               }
               end={link.to === '/'}
             >

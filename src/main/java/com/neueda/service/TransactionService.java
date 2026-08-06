@@ -7,7 +7,10 @@ import com.neueda.repository.AlertRepository;
 import com.neueda.repository.RuleRepository;
 import com.neueda.repository.TransactionRepository;
 import com.neueda.ruleengine.RuleEngine;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,7 +19,6 @@ import java.util.Locale;
 @Service
 public class TransactionService {
 
-    private static final long DEFAULT_SDN_RULE_ID = -1L;
     private static final String DEFAULT_SDN_RULE_NAME = "Built-in SDN Screening Rule";
     private static final String DEFAULT_SDN_RULE_TYPE = "SDN_SCREENING";
     private static final String DEFAULT_SDN_SEVERITY = "HIGH";
@@ -46,13 +48,38 @@ public class TransactionService {
 
     // Get transaction by Transaction ID
     public Transaction getTransactionById(String transactionId) {
+        if (!hasText(transactionId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Transaction ID is required");
+        }
+
         return repository.findByTransactionId(transactionId)
-                .orElseThrow(() -> new RuntimeException("Transaction not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found"));
     }
 
     // Add new transaction
     public Transaction addTransaction(Transaction transaction) {
-        Transaction savedTransaction = repository.save(transaction);
+        validateTransactionForCreate(transaction);
+
+        final String transactionId = transaction.getTransactionId().trim();
+        if (repository.findByTransactionId(transactionId).isPresent()) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Transaction ID already exists: " + transactionId
+            );
+        }
+
+        transaction.setTransactionId(transactionId);
+
+        final Transaction savedTransaction;
+        try {
+            savedTransaction = repository.save(transaction);
+        } catch (DataIntegrityViolationException exception) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Invalid transaction data. Ensure required fields are provided and transactionId is unique.",
+                    exception
+            );
+        }
 
         List<Rule> activeRules = ensureBuiltInSdnRule(ruleRepository.findByActiveTrue());
         if (activeRules.isEmpty()) {
@@ -90,17 +117,32 @@ public class TransactionService {
         }
 
         if (!hasSdnRule) {
-            Rule builtInSdnRule = new Rule();
-            builtInSdnRule.setId(DEFAULT_SDN_RULE_ID);
+            Rule builtInSdnRule = findPersistedSdnRule();
+            if (builtInSdnRule == null) {
+                builtInSdnRule = new Rule();
+            }
+
             builtInSdnRule.setRuleName(DEFAULT_SDN_RULE_NAME);
             builtInSdnRule.setRuleType(DEFAULT_SDN_RULE_TYPE);
             builtInSdnRule.setSeverity(DEFAULT_SDN_SEVERITY);
             builtInSdnRule.setThreshold(1.0d);
             builtInSdnRule.setActive(true);
-            resolvedRules.add(builtInSdnRule);
+
+            Rule persistedRule = ruleRepository.save(builtInSdnRule);
+            resolvedRules.add(persistedRule);
         }
 
         return resolvedRules;
+    }
+
+    private Rule findPersistedSdnRule() {
+        List<Rule> allRules = ruleRepository.findAll();
+        for (Rule rule : allRules) {
+            if (rule != null && rule.getId() != null && isSdnRuleType(rule.getRuleType())) {
+                return rule;
+            }
+        }
+        return null;
     }
 
     private boolean isSdnRuleType(final String ruleType) {
@@ -116,9 +158,12 @@ public class TransactionService {
 
     // Update transaction
     public Transaction updateTransaction(String transactionId, Transaction updatedTransaction) {
+        if (!hasText(transactionId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Transaction ID is required");
+        }
 
         Transaction existingTransaction = repository.findByTransactionId(transactionId)
-                .orElseThrow(() -> new RuntimeException("Transaction not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found"));
 
         existingTransaction.setAccountId(updatedTransaction.getAccountId());
         existingTransaction.setPayeeId(updatedTransaction.getPayeeId());
@@ -135,14 +180,59 @@ public class TransactionService {
 
     // Delete transaction
     public void deleteTransaction(String transactionId) {
+        if (!hasText(transactionId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Transaction ID is required");
+        }
 
         Transaction transaction = repository.findByTransactionId(transactionId)
-                .orElseThrow(() -> new RuntimeException("Transaction not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found"));
 
         // Delete all alerts linked to this transaction first to avoid FK constraint violation
         alertRepository.deleteAll(alertRepository.findByTransactionId(transaction.getId()));
 
         repository.delete(transaction);
+    }
+
+    private void validateTransactionForCreate(final Transaction transaction) {
+        if (transaction == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Transaction payload is required");
+        }
+
+        if (!hasText(transaction.getTransactionId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Transaction ID is required");
+        }
+
+        if (!hasText(transaction.getAccountId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Account ID is required");
+        }
+
+        if (!hasText(transaction.getPayeeId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payee ID is required");
+        }
+
+        if (!hasText(transaction.getCurrency())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Currency is required");
+        }
+
+        if (!hasText(transaction.getTransactionType())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Transaction type is required");
+        }
+
+        if (!hasText(transaction.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Status is required");
+        }
+
+        if (transaction.getAmount() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Amount is required");
+        }
+
+        if (transaction.getTransactionTime() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Transaction time is required");
+        }
+    }
+
+    private boolean hasText(final String value) {
+        return value != null && !value.trim().isEmpty();
     }
 
 }
