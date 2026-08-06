@@ -27,3 +27,6 @@ Thumbs.db
 # Docs/spreadsheets not needed in runtime image
 *.ods
 
+# Local reference repository used for comparison
+kk-04-rest-sol-main
+

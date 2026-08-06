@@ -180,7 +180,7 @@ docker run --rm -p 8080:8080 `
   transaction-monitoring-system:local
 ```
 
-### Run full local stack (MySQL + backend)
+### Run full local stack (MySQL + backend + frontend)
 
 ```powershell
 docker compose up --build
@@ -197,6 +197,27 @@ If you changed DB credentials and want a clean re-init:
 ```powershell
 docker compose down -v
 docker compose up --build
+```
+
+### Jenkins CI/CD (Linux server)
+
+- Pipeline file: `Jenkinsfile`
+- Format matches reference repo stages: checkout -> stop -> build -> deploy -> verify
+- Uses `docker-compose` commands for Amazon Linux compatibility
+
+Before creating Jenkins job:
+
+1. Update `GIT_URL` in `Jenkinsfile` to your real repository URL.
+2. Ensure Jenkins user can run Docker commands on Linux host.
+3. Install `docker-compose` (or provide `docker compose` alias) on the server.
+
+Minimal Jenkins execution flow:
+
+```bash
+docker-compose down || true
+docker-compose build --no-cache
+docker-compose up -d
+docker-compose ps
 ```
 
 ### GitHub Actions workflow
