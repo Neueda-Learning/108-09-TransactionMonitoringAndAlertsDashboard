@@ -181,6 +181,8 @@ export default function TransactionsPage({
             <input
               required
               type="datetime-local"
+              className="tx-datetime-input"
+              title="Select local date and time"
               value={formState.transactionTime}
               onChange={(event) =>
                 setFormState((prev) => ({ ...prev, transactionTime: event.target.value }))

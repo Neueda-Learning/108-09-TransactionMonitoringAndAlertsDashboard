@@ -152,6 +152,8 @@ export default function AlertsPage({ transactions, rules, onNotify }) {
 
   async function transitionAlert(alert, targetStatus) {
     if (!canTransitionAlert(alert.status, targetStatus)) return;
+
+
     setIsUpdatingStatus(true);
     try {
       await alertsApi.updateStatus(alert.id, targetStatus);
