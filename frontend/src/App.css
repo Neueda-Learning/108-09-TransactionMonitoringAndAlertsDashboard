@@ -591,6 +591,24 @@ input::placeholder {
   color: var(--muted);
 }
 
+/* Keep native datetime picker while matching the app's dark theme. */
+.tx-datetime-input {
+  color-scheme: dark;
+  min-height: 42px;
+  letter-spacing: 0.01em;
+}
+
+.tx-datetime-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.82;
+  filter: invert(76%) sepia(11%) saturate(1254%) hue-rotate(184deg) brightness(102%) contrast(94%);
+}
+
+.tx-datetime-input:hover::-webkit-calendar-picker-indicator,
+.tx-datetime-input:focus::-webkit-calendar-picker-indicator {
+  opacity: 1;
+}
+
 select option {
   background: var(--surface2);
   color: var(--text);

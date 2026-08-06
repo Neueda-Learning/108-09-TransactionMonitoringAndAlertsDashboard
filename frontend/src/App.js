@@ -12,14 +12,14 @@ import { alertsApi } from './api/alertsApi';
 
 const NOTIFICATION_TIMEOUT_MS = 3200;
 const ALERTS_POLL_INTERVAL_MS = Number(process.env.REACT_APP_ALERTS_POLL_MS || 3000);
-const RESOLVED_ALERT_STATUSES = new Set(['CLOSED', 'DISMISSED']);
-
-function isActiveAlert(alert) {
-  return !RESOLVED_ALERT_STATUSES.has(String(alert?.status || '').toUpperCase());
-}
+const ALERT_STATUS_OPEN = 'OPEN';
 
 function isHighSeverityAlert(alert) {
   return String(alert?.severity || '').toUpperCase() === 'HIGH';
+}
+
+function isOpenAlert(alert) {
+  return String(alert?.status || '').toUpperCase() === ALERT_STATUS_OPEN;
 }
 
 function buildTriggeredAlertMessage(alert) {
@@ -38,29 +38,11 @@ function AppShell() {
   const notificationTimersRef = useRef(new Map());
   const knownAlertIdsRef = useRef(new Set());
   const alertsInitializedRef = useRef(false);
-  const silencedHighAlertIdsRef = useRef(new Set());
-  const latestAlertsRef = useRef([]);
 
   const recomputeAlertsAttention = useCallback((alertsSnapshot) => {
-    const activeHighAlertIds = alertsSnapshot
-      .filter((alert) => isActiveAlert(alert) && isHighSeverityAlert(alert))
-      .map((alert) => String(alert.id ?? alert.alertId ?? ''))
-      .filter(Boolean);
-
-    const activeHighAlertIdSet = new Set(activeHighAlertIds);
-
-    // Keep silenced ids scoped to currently active HIGH alerts.
-    silencedHighAlertIdsRef.current.forEach((alertId) => {
-      if (!activeHighAlertIdSet.has(alertId)) {
-        silencedHighAlertIdsRef.current.delete(alertId);
-      }
-    });
-
-    const hasUnsilencedHighAlert = activeHighAlertIds.some(
-      (alertId) => !silencedHighAlertIdsRef.current.has(alertId)
+    setAlertsNeedAttention(
+      alertsSnapshot.some((alert) => isOpenAlert(alert) && isHighSeverityAlert(alert))
     );
-
-    setAlertsNeedAttention(hasUnsilencedHighAlert);
   }, []);
 
   const dismissNotification = useCallback((notificationId) => {
@@ -103,7 +85,6 @@ function AppShell() {
     try {
       const backendAlerts = await alertsApi.getAll();
       const safeAlerts = Array.isArray(backendAlerts) ? backendAlerts : [];
-      latestAlertsRef.current = safeAlerts;
       recomputeAlertsAttention(safeAlerts);
       const previousIds = knownAlertIdsRef.current;
       const nextIds = new Set(
@@ -134,17 +115,6 @@ function AppShell() {
       // Ignore polling errors here so existing page-level error handling remains unchanged.
     }
   }, [recomputeAlertsAttention, showNotification]);
-
-  const handleSilenceHighAlertAttention = useCallback((alert) => {
-    const alertId = String(alert?.id ?? alert?.alertId ?? '');
-
-    if (!alertId || !isHighSeverityAlert(alert)) {
-      return;
-    }
-
-    silencedHighAlertIdsRef.current.add(alertId);
-    recomputeAlertsAttention(latestAlertsRef.current);
-  }, [recomputeAlertsAttention]);
 
   useEffect(() => {
     pollAlerts();
@@ -321,7 +291,6 @@ function AppShell() {
                 transactions={transactions}
                 rules={rules}
                 onNotify={showNotification}
-                onSilenceHighAlertAttention={handleSilenceHighAlertAttention}
               />
             }
           />
