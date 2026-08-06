@@ -1,17 +1,60 @@
 import { useMemo } from 'react';
+import {
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  LineChart, Line,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+} from 'recharts';
 import PageHeader from '../components/PageHeader';
 import StatusBadge from '../components/StatusBadge';
 import { formatDateTime, formatMoney } from '../utils/formatters';
+
+const COLORS = {
+  primary: '#4f7eff',
+  accent: '#00d4ff',
+  success: '#00c48c',
+  warning: '#f59e0b',
+  danger: '#f43f5e',
+  purple: '#7c3aed',
+  muted: '#6b7da8'
+};
+
+const PIE_COLORS = [COLORS.success, COLORS.warning, COLORS.danger];
+const TYPE_COLORS = [COLORS.danger, COLORS.success];
+
+function CustomTooltip({ active, payload, label }) {
+  if (active && payload && payload.length) {
+    return (
+      <div style={{
+        background: '#162040', border: '1px solid #263660',
+        borderRadius: 10, padding: '10px 14px', color: '#e8edf8', fontSize: 13
+      }}>
+        {label && <div style={{ color: '#6b7da8', marginBottom: 4, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>}
+        {payload.map((p, i) => (
+          <div key={i} style={{ color: p.color || p.fill, fontWeight: 700 }}>
+            {p.name}: {typeof p.value === 'number' && p.value > 999 ? `₹${p.value.toLocaleString()}` : p.value}
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+}
 
 export default function DashboardPage({ transactions, rules, loading, error }) {
   const metrics = useMemo(() => {
     const activeRules = rules.filter((rule) => rule.active).length;
     const volume = transactions.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+    const completed = transactions.filter((tx) => tx.status === 'COMPLETED').length;
+    const debitCount = transactions.filter((tx) => tx.transactionType === 'DEBIT').length;
+    const avgValue = transactions.length > 0 ? volume / transactions.length : 0;
 
     return {
       transactionsCount: transactions.length,
       activeRules,
-      volume
+      volume,
+      completed,
+      debitCount,
+      avgValue
     };
   }, [transactions, rules]);
 
@@ -20,60 +63,271 @@ export default function DashboardPage({ transactions, rules, loading, error }) {
     [transactions]
   );
 
+  // Chart: transactions by day (last 7 days)
+  const volumeByDay = useMemo(() => {
+    const map = {};
+    transactions.forEach((tx) => {
+      if (!tx.transactionTime) return;
+      const date = new Date(tx.transactionTime);
+      const key = `${date.getMonth() + 1}/${date.getDate()}`;
+      if (!map[key]) map[key] = { date: key, volume: 0, count: 0 };
+      map[key].volume += Number(tx.amount || 0);
+      map[key].count += 1;
+    });
+    return Object.values(map).slice(-7).map((d) => ({
+      ...d,
+      avg: d.count > 0 ? Math.round(d.volume / d.count) : 0
+    }));
+  }, [transactions]);
+
+  // Chart: status distribution
+  const statusDistribution = useMemo(() => {
+    const counts = { COMPLETED: 0, PENDING: 0, FAILED: 0 };
+    transactions.forEach((tx) => {
+      if (counts[tx.status] !== undefined) counts[tx.status]++;
+    });
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [transactions]);
+
+  // Chart: debit vs credit
+  const typeDistribution = useMemo(() => {
+    const counts = { DEBIT: 0, CREDIT: 0 };
+    transactions.forEach((tx) => {
+      if (counts[tx.transactionType] !== undefined) counts[tx.transactionType]++;
+    });
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [transactions]);
+
+  // Chart: top accounts by volume
+  const topAccounts = useMemo(() => {
+    const map = {};
+    transactions.forEach((tx) => {
+      if (!tx.accountId) return;
+      if (!map[tx.accountId]) map[tx.accountId] = { account: tx.accountId, volume: 0 };
+      map[tx.accountId].volume += Number(tx.amount || 0);
+    });
+    return Object.values(map)
+      .sort((a, b) => b.volume - a.volume)
+      .slice(0, 6)
+      .map((d) => ({ ...d, account: d.account.length > 10 ? d.account.slice(0, 10) + '…' : d.account }));
+  }, [transactions]);
+
   return (
     <section>
       <PageHeader
         title="Dashboard"
-        subtitle="Operational view of transactions and rule configuration"
+        subtitle="Real-time operational view of transactions and rule configuration"
       />
 
-      {error ? <div className="error-box">{error}</div> : null}
+      {error ? <div className="error-box">⚠ {error}</div> : null}
 
-      <div className="card-grid">
-        <article className="card">
+      {/* ── KPI CARDS ── */}
+      <div className="card-grid card-grid-3">
+        <article className="card stat-card-primary">
+          <div className="card-icon" style={{ background: 'rgba(79,126,255,0.15)', color: '#4f7eff' }}>⬡</div>
           <h3>Total Transactions</h3>
           <strong>{metrics.transactionsCount}</strong>
+          <div className="card-trend">↑ Live data</div>
         </article>
-        <article className="card">
+        <article className="card stat-card-success">
+          <div className="card-icon" style={{ background: 'rgba(0,196,140,0.15)', color: '#00c48c' }}>✓</div>
+          <h3>Completed</h3>
+          <strong>{metrics.completed}</strong>
+          <div className="card-trend" style={{ color: '#00c48c' }}>
+            {metrics.transactionsCount > 0
+              ? `${((metrics.completed / metrics.transactionsCount) * 100).toFixed(0)}% success rate`
+              : '—'}
+          </div>
+        </article>
+        <article className="card stat-card-primary">
+          <div className="card-icon" style={{ background: 'rgba(0,212,255,0.12)', color: '#00d4ff' }}>₹</div>
+          <h3>Transaction Volume</h3>
+          <strong style={{ fontSize: 22 }}>{formatMoney(metrics.volume, 'INR')}</strong>
+          <div className="card-trend">Total value</div>
+        </article>
+        <article className="card stat-card-success">
+          <div className="card-icon" style={{ background: 'rgba(124,58,237,0.15)', color: '#a78bfa' }}>⚙</div>
           <h3>Active Rules</h3>
           <strong>{metrics.activeRules}</strong>
+          <div className="card-trend" style={{ color: '#a78bfa' }}>of {rules.length} total</div>
         </article>
-        <article className="card">
-          <h3>Transaction Volume</h3>
-          <strong>{formatMoney(metrics.volume, 'INR')}</strong>
+        <article className="card stat-card-warning">
+          <div className="card-icon" style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}>↓</div>
+          <h3>Debit Transactions</h3>
+          <strong>{metrics.debitCount}</strong>
+          <div className="card-trend" style={{ color: '#f59e0b' }}>
+            {metrics.transactionsCount > 0
+              ? `${((metrics.debitCount / metrics.transactionsCount) * 100).toFixed(0)}% of total`
+              : '—'}
+          </div>
+        </article>
+        <article className="card stat-card-primary">
+          <div className="card-icon" style={{ background: 'rgba(0,212,255,0.12)', color: '#00d4ff' }}>≈</div>
+          <h3>Avg. Transaction Value</h3>
+          <strong style={{ fontSize: 22 }}>{formatMoney(metrics.avgValue, 'INR')}</strong>
+          <div className="card-trend">Per transaction</div>
         </article>
       </div>
 
+      {/* ── CHARTS ── */}
+      {transactions.length > 0 && (
+        <div className="chart-grid chart-grid-3">
+          {/* Volume area chart */}
+          <div className="chart-panel">
+            <h3><span className="dot"></span>Transaction Volume Over Time</h3>
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={volumeByDay} margin={{ top: 4, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="volGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#4f7eff" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#4f7eff" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(79,126,255,0.08)" />
+                <XAxis dataKey="date" tick={{ fill: '#6b7da8', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#6b7da8', fontSize: 11 }} axisLine={false} tickLine={false} width={50} />
+                <Tooltip content={<CustomTooltip />} />
+                <Area type="monotone" dataKey="volume" name="Volume (₹)" stroke="#4f7eff" strokeWidth={2.5} fill="url(#volGrad)" dot={false} activeDot={{ r: 5, fill: '#4f7eff', stroke: '#fff', strokeWidth: 2 }} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Status donut */}
+          <div className="chart-panel">
+            <h3><span className="dot" style={{ background: '#00c48c' }}></span>Status Breakdown</h3>
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie data={statusDistribution} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={4} dataKey="value" nameKey="name">
+                  {statusDistribution.map((_, i) => (
+                    <Cell key={i} fill={PIE_COLORS[i]} stroke="transparent" />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+                <Legend iconType="circle" iconSize={8} formatter={(v) => <span style={{ color: '#b0bcd8', fontSize: 11 }}>{v}</span>} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Avg value line chart */}
+          <div className="chart-panel">
+            <h3><span className="dot" style={{ background: '#a78bfa' }}></span>Avg. Transaction Value by Day</h3>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={volumeByDay} margin={{ top: 4, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="avgGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#a78bfa" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="#a78bfa" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(79,126,255,0.08)" />
+                <XAxis dataKey="date" tick={{ fill: '#6b7da8', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#6b7da8', fontSize: 11 }} axisLine={false} tickLine={false} width={50} />
+                <Tooltip content={<CustomTooltip />} />
+                <Line type="monotone" dataKey="avg" name="Avg Value (₹)" stroke="#a78bfa" strokeWidth={2.5} dot={{ r: 4, fill: '#a78bfa', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Daily count bar */}
+          <div className="chart-panel">
+            <h3><span className="dot" style={{ background: '#00d4ff' }}></span>Daily Transaction Count</h3>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={volumeByDay} margin={{ top: 4, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#00d4ff" stopOpacity={0.9} />
+                    <stop offset="100%" stopColor="#4f7eff" stopOpacity={0.7} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(79,126,255,0.08)" vertical={false} />
+                <XAxis dataKey="date" tick={{ fill: '#6b7da8', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#6b7da8', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey="count" name="Transactions" fill="url(#barGrad)" radius={[6, 6, 0, 0]} maxBarSize={40} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Debit vs Credit */}
+          <div className="chart-panel">
+            <h3><span className="dot" style={{ background: '#f43f5e' }}></span>Debit vs Credit</h3>
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie data={typeDistribution} cx="50%" cy="50%" outerRadius={75} paddingAngle={5} dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                  {typeDistribution.map((_, i) => (
+                    <Cell key={i} fill={TYPE_COLORS[i]} stroke="transparent" />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Top accounts */}
+          <div className="chart-panel">
+            <h3><span className="dot" style={{ background: '#f59e0b' }}></span>Top Accounts by Volume</h3>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={topAccounts} layout="vertical" margin={{ top: 4, right: 16, left: 4, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="accGrad" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.8} />
+                    <stop offset="100%" stopColor="#f43f5e" stopOpacity={0.7} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(79,126,255,0.08)" horizontal={false} />
+                <XAxis type="number" tick={{ fill: '#6b7da8', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="account" tick={{ fill: '#b0bcd8', fontSize: 11 }} axisLine={false} tickLine={false} width={80} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey="volume" name="Volume (₹)" fill="url(#accGrad)" radius={[0, 6, 6, 0]} maxBarSize={20} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* ── RECENT TRANSACTIONS ── */}
       <article className="panel">
         <h2>Recent Transactions</h2>
-        {loading ? <p>Loading...</p> : null}
-        {!loading && recentTransactions.length === 0 ? <p>No transactions available.</p> : null}
+        {loading ? (
+          <div className="loading-state">
+            <div className="spinner"></div>
+            <span>Loading transactions…</span>
+          </div>
+        ) : null}
+        {!loading && recentTransactions.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">📭</div>
+            <p>No transactions available.</p>
+          </div>
+        ) : null}
 
         {!loading && recentTransactions.length > 0 ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Transaction ID</th>
-                <th>Account</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th>Time (MM/DD/YYYY)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentTransactions.map((tx) => (
-                <tr key={tx.id || tx.transactionId}>
-                  <td>{tx.transactionId}</td>
-                  <td>{tx.accountId}</td>
-                  <td>{formatMoney(tx.amount, tx.currency || 'USD')}</td>
-                  <td>
-                    <StatusBadge value={tx.status} />
-                  </td>
-                  <td>{formatDateTime(tx.transactionTime)}</td>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Transaction ID</th>
+                  <th>Account</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Time (MM/DD/YYYY)</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {recentTransactions.map((tx) => (
+                  <tr key={tx.id || tx.transactionId}>
+                    <td style={{ fontFamily: 'monospace', fontSize: 13, color: '#7ab2ff' }}>{tx.transactionId}</td>
+                    <td>{tx.accountId}</td>
+                    <td style={{ fontWeight: 600 }}>{formatMoney(tx.amount, tx.currency || 'USD')}</td>
+                    <td>
+                      <StatusBadge value={tx.status} />
+                    </td>
+                    <td style={{ color: '#6b7da8', fontSize: 13 }}>{formatDateTime(tx.transactionTime)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : null}
       </article>
     </section>

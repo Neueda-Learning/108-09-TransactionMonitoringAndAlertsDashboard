@@ -30,7 +30,8 @@ export default function TransactionsPage({
   error,
   onCreate,
   onUpdate,
-  onDelete
+  onDelete,
+  onNotify
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -66,6 +67,7 @@ export default function TransactionsPage({
 
   function startEdit(tx) {
     setEditingTransactionId(tx.transactionId);
+    onNotify?.(`Editing transaction ${tx.transactionId}.`, 'info');
     setFormState({
       transactionId: tx.transactionId || '',
       accountId: tx.accountId || '',
@@ -104,8 +106,9 @@ export default function TransactionsPage({
         subtitle="Record transactions and search/filter historic events"
       />
 
-      {error ? <div className="error-box">{error}</div> : null}
+      {error ? <div className="error-box">⚠ {error}</div> : null}
 
+      {/* ── FORM ── */}
       <div className="panel">
         <h2>{editingTransactionId ? 'Edit Transaction' : 'Add Transaction'}</h2>
 
@@ -205,10 +208,17 @@ export default function TransactionsPage({
 
           <div className="actions-row col-span-2">
             <button className="btn btn-primary" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : editingTransactionId ? 'Update' : 'Add'}
+              {isSubmitting ? 'Saving…' : editingTransactionId ? 'Update' : 'Add'}
             </button>
             {editingTransactionId ? (
-              <button className="btn" type="button" onClick={resetForm}>
+              <button
+                className="btn"
+                type="button"
+                onClick={() => {
+                  resetForm();
+                  onNotify?.('Transaction edit cancelled.', 'info');
+                }}
+              >
                 Cancel Edit
               </button>
             ) : null}
@@ -241,54 +251,73 @@ export default function TransactionsPage({
           </select>
         </div>
 
-        {loading ? <p>Loading...</p> : null}
-        {!loading && filteredTransactions.length === 0 ? <p>No transactions found.</p> : null}
+        {loading ? (
+          <div className="loading-state">
+            <div className="spinner"></div>
+            <span>Loading transactions…</span>
+          </div>
+        ) : null}
+        {!loading && filteredTransactions.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">🔍</div>
+            <p>No transactions found.</p>
+          </div>
+        ) : null}
 
         {!loading && filteredTransactions.length > 0 ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Transaction ID</th>
-                <th>Account</th>
-                <th>Payee</th>
-                <th>Payee Name</th>
-                <th>Amount</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th>Time</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredTransactions.map((tx) => (
-                <tr key={tx.id || tx.transactionId}>
-                  <td>{tx.transactionId}</td>
-                  <td>{tx.accountId}</td>
-                  <td>{tx.payeeId}</td>
-                  <td>{tx.payeeName || '-'}</td>
-                  <td>{formatMoney(tx.amount, tx.currency || 'USD')}</td>
-                  <td>{tx.transactionType}</td>
-                  <td>
-                    <StatusBadge value={tx.status} />
-                  </td>
-                  <td>{formatDateTime(tx.transactionTime)}</td>
-                  <td>
-                    <div className="table-actions">
-                      <button className="btn btn-small" onClick={() => startEdit(tx)}>
-                        Edit
-                      </button>
-                      <button
-                        className="btn btn-small btn-danger"
-                        onClick={() => onDelete(tx.transactionId)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Transaction ID</th>
+                  <th>Account</th>
+                  <th>Payee</th>
+                  <th>Payee Name</th>
+                  <th>Amount</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Time</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredTransactions.map((tx) => (
+                  <tr key={tx.id || tx.transactionId}>
+                    <td style={{ fontFamily: 'monospace', fontSize: 13, color: '#7ab2ff' }}>{tx.transactionId}</td>
+                    <td>{tx.accountId}</td>
+                    <td style={{ color: '#b0bcd8', fontSize: 13 }}>{tx.payeeId}</td>
+                    <td>{tx.payeeName || '-'}</td>
+                    <td style={{ fontWeight: 600 }}>{formatMoney(tx.amount, tx.currency || 'USD')}</td>
+                    <td>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 999,
+                        background: tx.transactionType === 'DEBIT' ? 'rgba(244,63,94,0.15)' : 'rgba(0,196,140,0.15)',
+                        color: tx.transactionType === 'DEBIT' ? '#ff7089' : '#00c48c',
+                        border: `1px solid ${tx.transactionType === 'DEBIT' ? 'rgba(244,63,94,0.3)' : 'rgba(0,196,140,0.3)'}`
+                      }}>{tx.transactionType}</span>
+                    </td>
+                    <td>
+                      <StatusBadge value={tx.status} />
+                    </td>
+                    <td style={{ color: '#6b7da8', fontSize: 13 }}>{formatDateTime(tx.transactionTime)}</td>
+                    <td>
+                      <div className="table-actions">
+                        <button className="btn btn-small" onClick={() => startEdit(tx)}>
+                          Edit
+                        </button>
+                        <button
+                          className="btn btn-small btn-danger"
+                          onClick={() => onDelete(tx.transactionId)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : null}
       </article>
     </section>
