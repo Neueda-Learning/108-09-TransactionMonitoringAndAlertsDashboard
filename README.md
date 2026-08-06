@@ -192,6 +192,16 @@ Docker database bootstrap behavior in this project:
 - Application tables are created automatically from `src/main/resources/schema.sql` when Docker backend starts.
 - Docker backend sets `SPRING_JPA_HIBERNATE_DDL_AUTO=none` and `SPRING_SQL_INIT_MODE=always`.
 
+Datasource URL rules:
+
+- If Spring runs inside Docker (the `backend` service), DB URL must use the service DNS name: `jdbc:mysql://mysql:3306/transaction_monitoring...`
+- If Spring runs outside Docker (IDE / `java -jar`) while MySQL runs in Docker with `8083:3306`, DB URL must be: `jdbc:mysql://localhost:8083/transaction_monitoring...`
+
+Important MySQL volume note:
+
+- `MYSQL_DATABASE` / `MYSQL_USER` are applied only on first init of an empty MySQL volume.
+- If volume already exists, old DB/user state is reused.
+
 If you changed DB credentials and want a clean re-init:
 
 ```powershell
