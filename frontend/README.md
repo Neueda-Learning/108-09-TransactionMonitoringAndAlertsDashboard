@@ -37,6 +37,12 @@ Create `.env` in `frontend` if needed:
 REACT_APP_API_BASE_URL=http://localhost:8080/api
 ```
 
+For production builds, create `.env.production` in `frontend`:
+
+```env
+REACT_APP_API_BASE_URL=http://10.9.70.176:8082/api
+```
+
 ## Run
 
 ```powershell

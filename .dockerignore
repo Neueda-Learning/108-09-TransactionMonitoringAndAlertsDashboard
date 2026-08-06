@@ -1,0 +1,29 @@
+# Git
+.git
+.gitignore
+
+# Build output
+target
+frontend/build
+
+# Node artifacts
+frontend/node_modules
+npm-debug.log*
+yarn-error.log*
+
+# IDE/editor files
+.idea
+.vscode
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local environment files
+.env
+.env.*
+
+# Docs/spreadsheets not needed in runtime image
+*.ods
+

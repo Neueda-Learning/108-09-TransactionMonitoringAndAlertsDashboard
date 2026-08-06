@@ -161,6 +161,44 @@ Frontend runs on: `http://localhost:3000`
 
 ---
 
+## Docker and CI/CD
+
+### Build backend image
+
+```powershell
+cd C:\Users\Administrator\108-09-TransactionMonitoringAndAlertsDashboard
+docker build -t transaction-monitoring-system:local .
+```
+
+### Run backend image
+
+```powershell
+docker run --rm -p 8080:8080 `
+  -e SPRING_DATASOURCE_URL="jdbc:mysql://host.docker.internal:3306/transaction_monitoring?useSSL=false&serverTimezone=UTC" `
+  -e SPRING_DATASOURCE_USERNAME="root" `
+  -e SPRING_DATASOURCE_PASSWORD="your-password" `
+  transaction-monitoring-system:local
+```
+
+### Run full local stack (MySQL + backend)
+
+```powershell
+docker compose up --build
+```
+
+### GitHub Actions workflow
+
+- Workflow file: `.github/workflows/backend-ci-cd.yml`
+- CI job runs: Maven tests + Docker image build
+- CD job (on `main`) builds and pushes image to Docker Hub
+
+Required repository secrets:
+
+- `DOCKERHUB_USERNAME`
+- `DOCKERHUB_TOKEN`
+
+---
+
 ## API Reference
 
 All endpoint details, request bodies, and response formats are documented in:
