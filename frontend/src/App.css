@@ -71,6 +71,10 @@ body::before {
   grid-template-columns: 2fr 1fr;
 }
 
+.chart-grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
 .chart-panel-span-2 {
   grid-column: span 2;
 }
@@ -213,6 +217,14 @@ body::before {
   gap: 16px;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   margin-bottom: 24px;
+}
+
+.card-grid-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.card-grid-3 {
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .card,
@@ -952,6 +964,14 @@ select option {
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   }
 
+  .card-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .card-grid-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
   .panel,
   .chart-panel,
   .card {
@@ -1038,6 +1058,14 @@ select option {
   .card-grid,
   .chart-grid {
     gap: 12px;
+  }
+
+  .card-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .card-grid-3 {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .panel,

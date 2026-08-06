@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
 import PageHeader from '../components/PageHeader';
@@ -44,12 +45,16 @@ export default function DashboardPage({ transactions, rules, loading, error }) {
     const activeRules = rules.filter((rule) => rule.active).length;
     const volume = transactions.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
     const completed = transactions.filter((tx) => tx.status === 'COMPLETED').length;
+    const debitCount = transactions.filter((tx) => tx.transactionType === 'DEBIT').length;
+    const avgValue = transactions.length > 0 ? volume / transactions.length : 0;
 
     return {
       transactionsCount: transactions.length,
       activeRules,
       volume,
-      completed
+      completed,
+      debitCount,
+      avgValue
     };
   }, [transactions, rules]);
 
@@ -69,7 +74,10 @@ export default function DashboardPage({ transactions, rules, loading, error }) {
       map[key].volume += Number(tx.amount || 0);
       map[key].count += 1;
     });
-    return Object.values(map).slice(-7);
+    return Object.values(map).slice(-7).map((d) => ({
+      ...d,
+      avg: d.count > 0 ? Math.round(d.volume / d.count) : 0
+    }));
   }, [transactions]);
 
   // Chart: status distribution
@@ -114,7 +122,7 @@ export default function DashboardPage({ transactions, rules, loading, error }) {
       {error ? <div className="error-box">⚠ {error}</div> : null}
 
       {/* ── KPI CARDS ── */}
-      <div className="card-grid">
+      <div className="card-grid card-grid-3">
         <article className="card stat-card-primary">
           <div className="card-icon" style={{ background: 'rgba(79,126,255,0.15)', color: '#4f7eff' }}>⬡</div>
           <h3>Total Transactions</h3>
@@ -143,11 +151,27 @@ export default function DashboardPage({ transactions, rules, loading, error }) {
           <strong>{metrics.activeRules}</strong>
           <div className="card-trend" style={{ color: '#a78bfa' }}>of {rules.length} total</div>
         </article>
+        <article className="card stat-card-warning">
+          <div className="card-icon" style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}>↓</div>
+          <h3>Debit Transactions</h3>
+          <strong>{metrics.debitCount}</strong>
+          <div className="card-trend" style={{ color: '#f59e0b' }}>
+            {metrics.transactionsCount > 0
+              ? `${((metrics.debitCount / metrics.transactionsCount) * 100).toFixed(0)}% of total`
+              : '—'}
+          </div>
+        </article>
+        <article className="card stat-card-primary">
+          <div className="card-icon" style={{ background: 'rgba(0,212,255,0.12)', color: '#00d4ff' }}>≈</div>
+          <h3>Avg. Transaction Value</h3>
+          <strong style={{ fontSize: 22 }}>{formatMoney(metrics.avgValue, 'INR')}</strong>
+          <div className="card-trend">Per transaction</div>
+        </article>
       </div>
 
-      {/* ── CHARTS ROW ── */}
+      {/* ── CHARTS ── */}
       {transactions.length > 0 && (
-        <div className="chart-grid chart-grid-split">
+        <div className="chart-grid chart-grid-3">
           {/* Volume area chart */}
           <div className="chart-panel">
             <h3><span className="dot"></span>Transaction Volume Over Time</h3>
@@ -183,12 +207,27 @@ export default function DashboardPage({ transactions, rules, loading, error }) {
               </PieChart>
             </ResponsiveContainer>
           </div>
-        </div>
-      )}
 
-      {/* ── SECOND CHARTS ROW ── */}
-      {transactions.length > 0 && (
-        <div className="chart-grid">
+          {/* Avg value line chart */}
+          <div className="chart-panel">
+            <h3><span className="dot" style={{ background: '#a78bfa' }}></span>Avg. Transaction Value by Day</h3>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={volumeByDay} margin={{ top: 4, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="avgGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#a78bfa" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="#a78bfa" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(79,126,255,0.08)" />
+                <XAxis dataKey="date" tick={{ fill: '#6b7da8', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#6b7da8', fontSize: 11 }} axisLine={false} tickLine={false} width={50} />
+                <Tooltip content={<CustomTooltip />} />
+                <Line type="monotone" dataKey="avg" name="Avg Value (₹)" stroke="#a78bfa" strokeWidth={2.5} dot={{ r: 4, fill: '#a78bfa', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
           {/* Daily count bar */}
           <div className="chart-panel">
             <h3><span className="dot" style={{ background: '#00d4ff' }}></span>Daily Transaction Count</h3>
